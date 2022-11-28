@@ -1,0 +1,16 @@
+{
+  "name": "electricity-availability",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/electricity-availability/src",
+  "projectType": "library",
+  "targets": {
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/electricity-availability/**/*.ts"]
+      }
+    }
+  },
+  "tags": []
+}
