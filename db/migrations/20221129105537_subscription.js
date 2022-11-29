@@ -4,8 +4,8 @@
  */
 exports.up = function(knex) {
   return knex.schema
-    .createTableIfNotExists('availability', function (table) {
-      table.boolean('is_available').notNullable();
+    .createTableIfNotExists('subscription', function (table) {
+      table.integer('chat_id').primary();
       table.dateTime('created_at', { useTz: true }).notNullable();
     });
 };
@@ -16,5 +16,5 @@ exports.up = function(knex) {
  */
 exports.down = function(knex) {
   return knex.schema
-    .dropTable('availability');
+    .dropTable('subscription');
 };

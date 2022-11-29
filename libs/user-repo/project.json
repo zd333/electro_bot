@@ -1,0 +1,16 @@
+{
+  "name": "user-repo",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/user-repo/src",
+  "projectType": "library",
+  "targets": {
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/user-repo/**/*.ts"]
+      }
+    }
+  },
+  "tags": []
+}

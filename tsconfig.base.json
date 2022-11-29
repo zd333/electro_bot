@@ -19,7 +19,8 @@
       "@electrobot/electricity-availability": [
         "libs/electricity-availability/src/index.ts"
       ],
-      "@electrobot/electricity-repo": ["libs/electricity-repo/src/index.ts"]
+      "@electrobot/electricity-repo": ["libs/electricity-repo/src/index.ts"],
+      "@electrobot/user-repo": ["libs/user-repo/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

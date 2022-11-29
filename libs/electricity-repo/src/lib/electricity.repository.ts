@@ -5,32 +5,27 @@ import { InjectKnex, Knex } from 'nestjs-knex';
 export class ElectricityRepository {
   constructor(@InjectKnex() private readonly knex: Knex) {}
 
-  public async getLatestAvailability(): Promise<
-    | {
-        readonly time: Date;
-        readonly isAvailable: boolean;
-      }
-    | undefined
+  public async getLatestAvailability(params: {
+    readonly numberOfLatestEvents: number;
+  }): Promise<
+    Array<{
+      readonly time: Date;
+      readonly isAvailable: boolean;
+    }>
   > {
     const queryRes = await this.knex
       .select<
         Array<{ readonly is_available: boolean; readonly created_at: Date }>
       >('*')
       .from('availability')
-      .limit(1)
+      .limit(params.numberOfLatestEvents)
       .offset(0)
       .orderBy('created_at', 'desc');
 
-    if (queryRes.length === 0) {
-      return undefined;
-    }
-
-    const [latest] = queryRes;
-
-    return {
-      time: latest.created_at,
-      isAvailable: latest.is_available,
-    };
+    return queryRes.map((item) => ({
+      time: item.created_at,
+      isAvailable: item.is_available,
+    }));
   }
 
   public async saveAvailability(params: {
