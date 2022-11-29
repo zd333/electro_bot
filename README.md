@@ -25,3 +25,12 @@ Pet project to track information about electricity outages.
 ## Deploy
 
 - `flyctl deploy`
+
+## Restart
+
+- `flyctl apps restart electrobot`
+
+## Disable/enable
+
+- `flyctl scale count 0` to disable
+- `flyctl scale count 1` to enable

@@ -26,7 +26,7 @@ export class BotService {
   }
 
   private async handleCurrentCommand(msg: TelegramBot.Message): Promise<void> {
-    this.logger.verbose(`Hadling message: ${JSON.stringify(msg)}`);
+    this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
     const latest =
       await this.electricityAvailabilityService.getLatestAvailability();
 

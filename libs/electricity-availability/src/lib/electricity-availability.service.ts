@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as ping from 'ping';
 
 const HOST = '94.45.154.74';
-
+const PING_RETRY_ATTEMPTS = 5;
 @Injectable()
 export class ElectricityAvailabilityService {
   private readonly logger = new Logger(ElectricityAvailabilityService.name);
@@ -11,7 +11,18 @@ export class ElectricityAvailabilityService {
   constructor(private readonly electricityRepository: ElectricityRepository) {}
 
   public async checkAndSaveElectricityAvailabilityState(): Promise<void> {
-    const { alive } = await ping.promise.probe(HOST);
+    let alive = false;
+    let attempts = 0;
+
+    while (!alive && attempts <= PING_RETRY_ATTEMPTS) {
+      const res = await ping.promise.probe(HOST, {
+        timeout: 5,
+        deadline: 10,
+      });
+
+      alive = res.alive;
+      attempts++;
+    }
 
     const latest = await this.electricityRepository.getLatestAvailability();
 
