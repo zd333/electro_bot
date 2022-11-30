@@ -2,15 +2,25 @@ import { ElectricityRepository } from '@electrobot/electricity-repo';
 import { Injectable, Logger } from '@nestjs/common';
 import * as ping from 'ping';
 import { Subject } from 'rxjs';
+import {
+  startOfToday,
+  startOfYesterday,
+  startOfWeek,
+  startOfMonth,
+  subDays,
+} from 'date-fns';
+import { convertToLocalTime, convertToTimeZone } from 'date-fns-timezone';
+import { HistoryItem } from './history-item.type';
 
-const HOST = '94.45.154.74';
+const HOST = process.env.HOST_TO_CHECK_AVAILABILITY as string;
 const PING_RETRY_ATTEMPTS = 5;
 @Injectable()
 export class ElectricityAvailabilityService {
   private readonly logger = new Logger(ElectricityAvailabilityService.name);
   private readonly _availabilityChange$ = new Subject<void>();
 
-  public readonly availabilityChange$ = this._availabilityChange$.asObservable();
+  public readonly availabilityChange$ =
+    this._availabilityChange$.asObservable();
 
   constructor(private readonly electricityRepository: ElectricityRepository) {}
 
@@ -28,33 +38,128 @@ export class ElectricityAvailabilityService {
       attempts++;
     }
 
-    const [latest] = await this.electricityRepository.getLatestAvailability({ numberOfLatestEvents: 1 });
+    const [latest] = await this.electricityRepository.getLatestAvailability({
+      limit: 1,
+    });
 
     if (latest?.isAvailable === alive) {
-      this.logger.verbose(
-        `Current availability state (${alive}) haven't changed, skipping save`
-      );
+      // this.logger.verbose(
+      //   `Current availability state (${alive}) haven't changed, skipping save`
+      // );
 
       return;
     }
+
+    await this.electricityRepository.saveAvailability({ isAvailable: alive });
 
     this._availabilityChange$.next();
 
     this.logger.verbose(
       `Availability state changed from ${latest?.isAvailable} to ${alive}, saving`
     );
-
-    await this.electricityRepository.saveAvailability({ isAvailable: alive });
   }
 
   public async getLatestAvailability(params: {
-    readonly numberOfLatestEvents: number;
+    readonly limit?: number;
   }): Promise<
-  Array<{
-    readonly time: Date;
-    readonly isAvailable: boolean;
-  }>
-> {
+    Array<{
+      readonly time: Date;
+      readonly isAvailable: boolean;
+    }>
+  > {
     return this.electricityRepository.getLatestAvailability(params);
+  }
+
+  // TODO: refactor (make cleaner)
+  public async getStats(params: { readonly timeZone: string }): Promise<{
+    readonly history: {
+      readonly today?: Array<HistoryItem>;
+      readonly yesterday?: Array<HistoryItem>;
+    };
+  }> {
+    const { timeZone } = params;
+    this.logger.warn(timeZone);
+    const now = new Date();
+    this.logger.warn(now);
+    const todayStart = convertToLocalTime(startOfToday(), { timeZone });
+    const yesterdayStart = convertToLocalTime(startOfYesterday(), { timeZone });
+
+    const todayData = (
+      await this.electricityRepository.getLatestAvailability({
+        from: todayStart,
+        till: now,
+      })
+    ).map((item) => ({
+      ...item,
+      time: convertToTimeZone(item.time, { timeZone }),
+    }));
+    const todayHistory = this.availabilityDataToHistory({
+      start: todayStart,
+      end: now,
+      sortedAvailabilityData: todayData,
+    });
+
+    const yesterdayData = (
+      await this.electricityRepository.getLatestAvailability({
+        from: yesterdayStart,
+        till: todayStart,
+      })
+    ).map((item) => ({
+      ...item,
+      time: convertToTimeZone(item.time, { timeZone }),
+    }));
+    const yesterdayHistory = this.availabilityDataToHistory({
+      start: yesterdayStart,
+      end: todayStart,
+      sortedAvailabilityData: yesterdayData,
+    });
+
+    // TODO: finish (stats)
+
+    return {
+      history: {
+        today: todayHistory,
+        yesterday: yesterdayHistory,
+      },
+    };
+  }
+
+  private availabilityDataToHistory(params: {
+    readonly start: Date;
+    readonly end: Date;
+    readonly sortedAvailabilityData: Array<{
+      readonly time: Date;
+      readonly isAvailable: boolean;
+    }>;
+  }): Array<HistoryItem> {
+    const { start, end, sortedAvailabilityData } = params;
+    const fromOldest = [...sortedAvailabilityData].reverse();
+
+    if (fromOldest.length === 0) {
+      return [];
+    }
+
+    const first: HistoryItem = {
+      start,
+      end: fromOldest[0].time,
+      isEnabled: !fromOldest[0].isAvailable,
+    };
+    const last: HistoryItem = {
+      start: fromOldest[fromOldest.length - 1].time,
+      end,
+      isEnabled: fromOldest[fromOldest.length - 1].isAvailable,
+    };
+
+    if (fromOldest.length === 1) {
+      return [first, last];
+    }
+
+    const middle = fromOldest.slice(0, -1).map((item, i) => ({
+      start: item.time,
+      end: fromOldest[i + 1].time,
+      isEnabled: item.isAvailable,
+    }));
+
+    return [first, ...middle, last];
   }
 }

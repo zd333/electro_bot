@@ -22,15 +22,19 @@ Pet project to track information about electricity outages.
 
 `flyctl proxy 5433 -a pg-electro-bot`
 
-## Deploy
-
-- `flyctl deploy`
-
-## Restart
-
-- `flyctl apps restart electrobot`
-
 ## Disable/enable
 
 - `flyctl scale count 0` to disable
 - `flyctl scale count 1` to enable
+
+## Deploy
+
+TODO: this is tmp solution, come up with normal flow.
+
+- `flyctl scale count 0`
+- `flyctl deploy`
+- `flyctl scale count 1`
+
+## Restart
+
+- `flyctl apps restart electrobot`

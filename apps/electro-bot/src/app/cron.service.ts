@@ -11,7 +11,7 @@ export class CronService {
     private readonly electricityAvailabilityService: ElectricityAvailabilityService
   ) {}
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_MINUTE)
   public async checkElectricityAvailability(): Promise<void> {
     if (this.isCheckingElectricityAvailability) {
       this.logger.warn('Previous electricity check was in progress when new cron iteration started, skipping current one');
@@ -19,10 +19,10 @@ export class CronService {
       return;
     }
 
-    this.logger.verbose('Starting electricity check');
+    // this.logger.verbose('Starting electricity check');
     this.isCheckingElectricityAvailability = true;
     await this.electricityAvailabilityService.checkAndSaveElectricityAvailabilityState();
     this.isCheckingElectricityAvailability = false;
-    this.logger.verbose('Finished electricity check');
+    // this.logger.verbose('Finished electricity check');
   }
 }
