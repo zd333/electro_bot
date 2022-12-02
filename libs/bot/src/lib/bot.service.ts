@@ -116,7 +116,7 @@ export class BotService {
     });
     const response = latest.isAvailable
       ? `${EMOJ_BULB} Наразі все добре - світло в ${PLACE} є!\nВключення відбулося ${when}.\nСвітло є вже ${howLong}.\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`
-      : `${EMOJ_MOON} Нажаль, наразі світла в ${PLACE} нема.\nВимкнення відбулося ${when}.\nСвітло відсутнє вже ${howLong}.\nПричина вимкнення - йо#ана русня! ${EMOJ_POOP}`;
+      : `${EMOJ_MOON} Нажаль, наразі світла в ${PLACE} нема.\nВимкнення відбулося ${when}.\nСвітло відсутнє вже ${howLong}.\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nПідтримати українську армію можна тут @Donate1024Bot`;
 
     this.telegramBot.sendMessage(msg.chat.id, response);
   }
@@ -298,7 +298,7 @@ export class BotService {
   }
 
   private async handleAboutCommand(msg: TelegramBot.Message): Promise<void> {
-    const response = `${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\nБажано автора зайвий раз не турбувати, дякую`;
+    const response = `Якщо вам подобається цей бот - можете подякувати донатом на підтримку української армії @Donate1024Bot.\n${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\nБажано автора зайвий раз не турбувати, дякую.`;
 
     this.telegramBot.sendMessage(msg.chat.id, response);
   }
@@ -332,7 +332,7 @@ export class BotService {
     if (!previous) {
       response = latest.isAvailable
         ? `${EMOJ_BULB} ${when}\nЮхууу, світло в ${PLACE} включили!\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`
-        : `${EMOJ_MOON} ${when}\nЙой, світло в ${PLACE} вимкнено!\nПричина вимкнення - йо#ана русня! ${EMOJ_POOP}`;
+        : `${EMOJ_MOON} ${when}\nЙой, світло в ${PLACE} вимкнено!\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nПідтримати українську армію можна тут @Donate1024Bot`;
     } else {
       const previousTime = convertToTimeZone(previous.time, {
         timeZone: TIME_ZONE,
@@ -344,7 +344,7 @@ export class BotService {
 
       response = latest.isAvailable
         ? `${EMOJ_BULB} ${when}\nЮхууу, світло в ${PLACE} включили!\nСвітло було відсутнє ${howLong}.\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`
-        : `${EMOJ_MOON} ${when}\nЙой, світло в ${PLACE} вимкнено!\nМи насолоджувалися світлом ${howLong}.\nПричина вимкнення - йо#ана русня! ${EMOJ_POOP}`;
+        : `${EMOJ_MOON} ${when}\nЙой, світло в ${PLACE} вимкнено!\nМи насолоджувалися світлом ${howLong}.\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nПідтримати українську армію можна тут @Donate1024Bot`;
     }
 
     subscribers.forEach(({ chatId }) => {
