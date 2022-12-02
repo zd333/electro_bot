@@ -1,7 +1,12 @@
 import { ElectricityAvailabilityService } from '@electrobot/electricity-availability';
 import { UserRepository } from '@electrobot/user-repo';
 import { Injectable, Logger } from '@nestjs/common';
-import { addMinutes, differenceInMinutes, format, formatDistance } from 'date-fns';
+import {
+  addMinutes,
+  differenceInMinutes,
+  format,
+  formatDistance,
+} from 'date-fns';
 import { convertToTimeZone } from 'date-fns-timezone';
 import { uk } from 'date-fns/locale';
 import * as TelegramBot from 'node-telegram-bot-api';
@@ -9,6 +14,13 @@ import * as Emoji from 'node-emoji';
 
 const TIME_ZONE = process.env.PLACE_TIMEZONE as string;
 const PLACE = process.env.PLACE_NAME as string;
+
+const EMOJ_UA = Emoji.get(Emoji.emoji['flag-ua']);
+const EMOJ_POOP = Emoji.get(Emoji.emoji['poop']);
+const EMOJ_BULB = Emoji.get(Emoji.emoji['bulb']);
+const EMOJ_MOON = Emoji.get(Emoji.emoji['new_moon_with_face']);
+const EMOJ_KISS = Emoji.get(Emoji.emoji['kiss']);
+const EMOJ_KISS_HEART = Emoji.get(Emoji.emoji['kissing_heart']);
 
 @Injectable()
 export class BotService {
@@ -60,9 +72,7 @@ export class BotService {
   private async handleStartCommand(msg: TelegramBot.Message): Promise<void> {
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
-    const response = `Привіт! Цей бот допомогає моніторити ситуацію зі світлом (електроенергією) в ${PLACE}.\n\nЗа допомогою команди /current ти завжди можеш дізнатися чи є зараз в кварталі світло і як довго це триває.\n\nКоманда /subscribe дозволяє підписатися на сповіщення щодо зміни ситуації (відключення/включення).\n\nЗа допомогою команди /stats можна переглянути статистику (звіт по включенням/відключенням за поточну і попередню добу, сумарний час наявності/відсутності світла).\n${Emoji.get(
-      Emoji.emoji['flag-ua']
-    )}${Emoji.get(Emoji.emoji['flag-ua'])}${Emoji.get(Emoji.emoji['flag-ua'])}`;
+    const response = `Привіт! Цей бот допомогає моніторити ситуацію зі світлом (електроенергією) в ${PLACE}.\n\nЗа допомогою команди /current ти завжди можеш дізнатися чи є зараз в кварталі світло і як довго це триває.\n\nКоманда /subscribe дозволяє підписатися на сповіщення щодо зміни ситуації (відключення/включення).\n\nЗа допомогою команди /stats можна переглянути статистику (звіт по включенням/відключенням за поточну і попередню добу, сумарний час наявності/відсутності світла).\n${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
 
     this.telegramBot.sendMessage(msg.chat.id, response);
 
@@ -75,11 +85,7 @@ export class BotService {
       return;
     }
 
-    const fuckRussiansResponse = `Доречі, ми помітили, що у тебе в Telegram встановлена російська мова${Emoji.get(
-      Emoji.emoji['poop']
-    )}.\nЗакликаємо натомість перейти на солов‘їну, адже українська мова - найкраща!${Emoji.get(
-      Emoji.emoji['flag-ua']
-    )}${Emoji.get(Emoji.emoji['flag-ua'])}${Emoji.get(Emoji.emoji['flag-ua'])}`;
+    const fuckRussiansResponse = `Доречі, ми помітили, що у тебе в Telegram встановлена російська мова${EMOJ_POOP}.\nЗакликаємо натомість перейти на солов‘їну, адже українська мова - найкраща!${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
 
     this.telegramBot.sendMessage(msg.chat.id, fuckRussiansResponse);
   }
@@ -109,18 +115,8 @@ export class BotService {
       includeSeconds: false,
     });
     const response = latest.isAvailable
-      ? `${Emoji.get(
-          Emoji.emoji['bulb']
-        )} Наразі все добре - світло в ${PLACE} є!\nВключення відбулося ${when}.\nСвітло є вже ${howLong}.\nСлава Україні! ${Emoji.get(
-          Emoji.emoji['flag-ua']
-        )}${Emoji.get(Emoji.emoji['flag-ua'])}${Emoji.get(
-          Emoji.emoji['flag-ua']
-        )}`
-      : `${Emoji.get(
-          Emoji.emoji['new_moon_with_face']
-        )} Нажаль, наразі світла в ${PLACE} нема.\nВідключення відбулося ${when}.\nСвітло відсутнє вже ${howLong}.\nПричина вимкнення - йо#ана русня! ${Emoji.get(
-          Emoji.emoji['poop']
-        )}`;
+      ? `${EMOJ_BULB} Наразі все добре - світло в ${PLACE} є!\nВключення відбулося ${when}.\nСвітло є вже ${howLong}.\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`
+      : `${EMOJ_MOON} Нажаль, наразі світла в ${PLACE} нема.\nВимкнення відбулося ${when}.\nСвітло відсутнє вже ${howLong}.\nПричина вимкнення - йо#ана русня! ${EMOJ_POOP}`;
 
     this.telegramBot.sendMessage(msg.chat.id, response);
   }
@@ -165,12 +161,15 @@ export class BotService {
 
     let response = '';
 
-    if (!!stats.history.yesterday?.length && stats.history.yesterday?.length > 1) {
+    if (
+      !!stats.history.yesterday?.length &&
+      stats.history.yesterday?.length > 1
+    ) {
       if (response.length > 0) {
         response += '\n\n';
       }
 
-      response += `${Emoji.get(Emoji.emoji['kiss'])} Вчора:`;
+      response += `${EMOJ_KISS} Вчора:`;
 
       const yesterday = stats.history.yesterday;
 
@@ -182,9 +181,15 @@ export class BotService {
         const durationInMinutes = differenceInMinutes(start, end);
 
         if (isEnabled) {
-          baseDatePlusAvailable = addMinutes(baseDatePlusAvailable, durationInMinutes);
+          baseDatePlusAvailable = addMinutes(
+            baseDatePlusAvailable,
+            durationInMinutes
+          );
         } else {
-          baseDatePluesUnavailable = addMinutes(baseDatePluesUnavailable, durationInMinutes);
+          baseDatePluesUnavailable = addMinutes(
+            baseDatePluesUnavailable,
+            durationInMinutes
+          );
         }
       });
 
@@ -192,25 +197,31 @@ export class BotService {
         locale: uk,
         includeSeconds: false,
       });
-      const howLongUnavailable = formatDistance(baseDatePluesUnavailable, baseDate, {
-        locale: uk,
-        includeSeconds: false,
-      });
+      const howLongUnavailable = formatDistance(
+        baseDatePluesUnavailable,
+        baseDate,
+        {
+          locale: uk,
+          includeSeconds: false,
+        }
+      );
 
       response = `${response}\nЗі світлом: ${howLongAvailable}\nБез світла: ${howLongUnavailable}`;
 
       yesterday.forEach(({ start, end, isEnabled }, i) => {
-        const emoji = isEnabled
-          ? Emoji.get(Emoji.emoji['bulb'])
-          : Emoji.get(Emoji.emoji['new_moon_with_face']);
+        const emoji = isEnabled ? EMOJ_BULB : EMOJ_MOON;
         const s = format(start, 'HH:mm', { locale: uk });
         const e = format(end, 'HH:mm', { locale: uk });
+        const duration = formatDistance(end, start, {
+          locale: uk,
+          includeSeconds: false,
+        });
         const entry =
           i === 0
             ? `${emoji} до ${e}`
-            : i === (yesterday.length - 1)
+            : i === yesterday.length - 1
             ? `${emoji} з ${s}`
-            : `${emoji} ${s}-${e}`;
+            : `${emoji} ${s}-${e} (${duration})`;
 
         response = `${response}\n${entry}`;
       });
@@ -221,7 +232,7 @@ export class BotService {
         response += '\n\n';
       }
 
-      response += `${Emoji.get(Emoji.emoji['kissing_heart'])} Сьогодні:`;
+      response += `${EMOJ_KISS_HEART} Сьогодні:`;
 
       const today = stats.history.today;
 
@@ -233,9 +244,15 @@ export class BotService {
         const durationInMinutes = differenceInMinutes(start, end);
 
         if (isEnabled) {
-          baseDatePlusAvailable = addMinutes(baseDatePlusAvailable, durationInMinutes);
+          baseDatePlusAvailable = addMinutes(
+            baseDatePlusAvailable,
+            durationInMinutes
+          );
         } else {
-          baseDatePluesUnavailable = addMinutes(baseDatePluesUnavailable, durationInMinutes);
+          baseDatePluesUnavailable = addMinutes(
+            baseDatePluesUnavailable,
+            durationInMinutes
+          );
         }
       });
 
@@ -243,28 +260,33 @@ export class BotService {
         locale: uk,
         includeSeconds: false,
       });
-      const howLongUnavailable = formatDistance(baseDatePluesUnavailable, baseDate, {
-        locale: uk,
-        includeSeconds: false,
-      });
+      const howLongUnavailable = formatDistance(
+        baseDatePluesUnavailable,
+        baseDate,
+        {
+          locale: uk,
+          includeSeconds: false,
+        }
+      );
 
       response = `${response}\nЗі світлом: ${howLongAvailable}\nБез світла: ${howLongUnavailable}`;
 
-
       today.forEach(({ start, end, isEnabled }, i) => {
-        const emoji = isEnabled
-          ? Emoji.get(Emoji.emoji['bulb'])
-          : Emoji.get(Emoji.emoji['new_moon_with_face']);
+        const emoji = isEnabled ? EMOJ_BULB : EMOJ_MOON;
         const s = format(start, 'HH:mm', { locale: uk });
         const e = format(end, 'HH:mm', { locale: uk });
+        const duration = formatDistance(end, start, {
+          locale: uk,
+          includeSeconds: false,
+        });
         const entry =
           i === 0
             ? `${emoji} до ${e}`
-            : i === (today.length - 1)
+            : i === today.length - 1
             ? `${emoji} з ${s}`
-            : `${emoji} ${s}-${e}`;
+            : `${emoji} ${s}-${e} (${duration})`;
 
-            response = `${response}\n${entry}`;
+        response = `${response}\n${entry}`;
       });
     }
 
@@ -276,7 +298,7 @@ export class BotService {
   }
 
   private async handleAboutCommand(msg: TelegramBot.Message): Promise<void> {
-    const response = `${Emoji.get(Emoji.emoji['kissing_heart'])} Обіймаю, навіки ваш @oleksandr_changli\nБажано автора зайвий раз не турбувати, дякую`;
+    const response = `${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\nБажано автора зайвий раз не турбувати, дякую`;
 
     this.telegramBot.sendMessage(msg.chat.id, response);
   }
@@ -304,22 +326,13 @@ export class BotService {
     const latestTime = convertToTimeZone(latest.time, {
       timeZone: TIME_ZONE,
     });
-    const when = format(latestTime, 'd.MM HH:mm', { locale: uk });
+    const when = format(latestTime, 'HH:mm dd.MM', { locale: uk });
     let response: string;
 
     if (!previous) {
       response = latest.isAvailable
-        ? `${Emoji.get(Emoji.emoji['bulb']
-          )} ${when}\nУра, світло в ${PLACE} включили!\nСлава Україні! ${Emoji.get(
-            Emoji.emoji['flag-ua']
-          )}${Emoji.get(Emoji.emoji['flag-ua'])}${Emoji.get(
-            Emoji.emoji['flag-ua']
-          )}`
-        : `${Emoji.get(
-            Emoji.emoji['new_moon_with_face']
-          )} ${when}\nУвага, світло в ${PLACE} вимкнено.\nПричина вимкнення - йо#ана русня! ${Emoji.get(
-            Emoji.emoji['poop']
-          )}`;
+        ? `${EMOJ_BULB} ${when}\nЮхууу, світло в ${PLACE} включили!\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`
+        : `${EMOJ_MOON} ${when}\nЙой, світло в ${PLACE} вимкнено!\nПричина вимкнення - йо#ана русня! ${EMOJ_POOP}`;
     } else {
       const previousTime = convertToTimeZone(previous.time, {
         timeZone: TIME_ZONE,
@@ -330,22 +343,20 @@ export class BotService {
       });
 
       response = latest.isAvailable
-        ? `${Emoji.get(
-            Emoji.emoji['bulb']
-          )} ${when}\nУра, світло в ${PLACE} включили!\nСвітло було відсутнє ${howLong}.\nСлава Україні! ${Emoji.get(
-            Emoji.emoji['flag-ua']
-          )}${Emoji.get(Emoji.emoji['flag-ua'])}${Emoji.get(
-            Emoji.emoji['flag-ua']
-          )}`
-        : `${Emoji.get(
-            Emoji.emoji['new_moon_with_face']
-          )} ${when}\nУвага, світло в ${PLACE} вимкнено.\nДо вимкнення світло було доступне ${howLong}.\nПричина вимкнення - йо#ана русня! ${Emoji.get(
-            Emoji.emoji['poop']
-          )}`;
+        ? `${EMOJ_BULB} ${when}\nЮхууу, світло в ${PLACE} включили!\nСвітло було відсутнє ${howLong}.\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`
+        : `${EMOJ_MOON} ${when}\nЙой, світло в ${PLACE} вимкнено!\nМи насолоджувалися світлом ${howLong}.\nПричина вимкнення - йо#ана русня! ${EMOJ_POOP}`;
     }
 
     subscribers.forEach(({ chatId }) => {
-      this.telegramBot.sendMessage(chatId, response);
+      try {
+        this.telegramBot.sendMessage(chatId, response);
+      } catch (e) {
+        this.logger.error(
+          `Failed to send notification to ${chatId} chat ID: ${JSON.stringify(
+            e
+          )}`
+        );
+      }
     });
 
     this.logger.verbose(
