@@ -24,6 +24,7 @@ export class ElectricityAvailabilityService {
 
   constructor(private readonly electricityRepository: ElectricityRepository) {}
 
+  // TODO: add threshold logic to filter fake electricity disabled events due to network (ping) issues
   public async checkAndSaveElectricityAvailabilityState(): Promise<void> {
     let alive = false;
     let attempts = 0;

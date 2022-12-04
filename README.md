@@ -38,3 +38,10 @@ TODO: this is tmp solution, come up with normal flow.
 ## Restart
 
 - `flyctl apps restart electrobot`
+
+## Recreate builder
+
+Do this when no space left on builder device:
+
+- `flyctl apps list | grep builder`
+- `flyctl apps destroy <name>`

@@ -22,6 +22,41 @@ const EMOJ_MOON = Emoji.get(Emoji.emoji['new_moon_with_face']);
 const EMOJ_KISS = Emoji.get(Emoji.emoji['kiss']);
 const EMOJ_KISS_HEART = Emoji.get(Emoji.emoji['kissing_heart']);
 
+const RESP_START = `Привіт! Цей бот допомогає моніторити ситуацію зі світлом (електроенергією) в ${PLACE}.\n\nЗа допомогою команди /current ти завжди можеш дізнатися чи є зараз в кварталі світло і як довго це триває.\n\nКоманда /subscribe дозволяє підписатися на сповіщення щодо зміни ситуації (відключення/включення).\n\nЗа допомогою команди /stats можна переглянути статистику (звіт по включенням/відключенням за поточну і попередню добу, сумарний час наявності/відсутності світла).\n${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+const RESP_START_SECOND_TEST_MODE =
+  'Бот поки що працює в тестовому режимі, тому ми заздалегідь просимо пробачити можливі помилки і глюки.\nЗ часом вони всі будуть виправлені.';
+const RESP_FUCK_RU = `Доречі, ми помітили, що у тебе в Telegram встановлена російська мова${EMOJ_POOP}.\nЗакликаємо натомість перейти на солов‘їну, адже українська мова - найкраща!${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+const RESP_NO_CURRENT_INFO = `Нажаль, наразі інформація щодо наявності світла в ${PLACE} відсутня.`;
+const RESP_CURRENTLY_AVAILABLE = (params: {
+  readonly when: string;
+  readonly howLong: string;
+}) =>
+  `${EMOJ_BULB} Наразі все добре - світло в ${PLACE} є!\nВключення відбулося ${params.when}.\nСвітло є вже ${params.howLong}.\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+const RESP_CURRENTLY_UNAVAILABLE = (params: {
+  readonly when: string;
+  readonly howLong: string;
+}) =>
+  `${EMOJ_MOON} Нажаль, наразі світла в ${PLACE} нема.\nВимкнення відбулося ${params.when}.\nСвітло відсутнє вже ${params.howLong}.\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nСкеруйте лють до русні підтримавши українську армію!\nОсь один із зручних способів зробити донат: @Donate1024Bot.`;
+const RESP_SUBSCRIPTION_CREATED = `Підписка створена - ти будеш отримувати повідомлення кожного разу після зміни ситуації зі світлом в ${PLACE}.\nТи завжди можеш відписатися за допомогою команди /unsubscribe.`;
+const RESP_SUBSCRIPTION_ALREADY_EXISTS = `Підписка вже створена і ти вже отримуєш повідомлення кожного разу після зміни ситуації зі світлом в ${PLACE}.\nТи завжди можеш відписатися за допомогою команди /unsubscribe.`;
+const RESP_UNSUBSCRIBED = `Підписка скасована - ти більше не будеш отримувати повідомлення щодо зміни ситуації зі світлом в ${PLACE}.`;
+const RESP_WAS_NOT_SUBSCRIBED = `Підписка і так відсутня, ти зараз не отримуєш повідомлення щодо зміни ситуації зі світлом в ${PLACE}.`;
+const RESP_ABOUT = `Якщо вам подобається цей бот - можете подякувати донатом на підтримку української армії @Donate1024Bot.\n\n${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\n\nhttps://github.com/zd333/electro_bot\n\nhttps://www.instagram.com/oleksandr_changli/`;
+const RESP_ENABLED_SHORT = (params: { readonly when: string }) =>
+  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${PLACE} включили!\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+const RESP_DISABLED_SHORT = (params: { readonly when: string }) =>
+  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${PLACE} вимкнено!\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nСкеруйте лють до русні підтримавши українську армію!\n Ось один із зручних способів зробити донат: @Donate1024Bot.`;
+const RESP_ENABLED_DETAILED = (params: {
+  readonly when: string;
+  readonly howLong: string;
+}) =>
+  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${PLACE} включили!\nСвітло було відсутнє ${params.howLong}.\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+const RESP_DISABLED_DETAILED = (params: {
+  readonly when: string;
+  readonly howLong: string;
+}) =>
+  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${PLACE} вимкнено!\nМи насолоджувалися світлом ${params.howLong}.\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nСкеруйте лють до русні підтримавши українську армію!\n Ось один із зручних способів зробити донат: @Donate1024Bot.`;
+
 @Injectable()
 export class BotService {
   private readonly logger = new Logger(BotService.name);
@@ -72,22 +107,14 @@ export class BotService {
   private async handleStartCommand(msg: TelegramBot.Message): Promise<void> {
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
-    const response = `Привіт! Цей бот допомогає моніторити ситуацію зі світлом (електроенергією) в ${PLACE}.\n\nЗа допомогою команди /current ти завжди можеш дізнатися чи є зараз в кварталі світло і як довго це триває.\n\nКоманда /subscribe дозволяє підписатися на сповіщення щодо зміни ситуації (відключення/включення).\n\nЗа допомогою команди /stats можна переглянути статистику (звіт по включенням/відключенням за поточну і попередню добу, сумарний час наявності/відсутності світла).\n${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
-
-    this.telegramBot.sendMessage(msg.chat.id, response);
-
-    const tmpResponse =
-      'Бот поки що працює в тестовому режимі, тому ми заздалегідь просимо пробачити можливі помилки і глюки.\nЗ часом вони всі будуть виправлені.';
-
-    this.telegramBot.sendMessage(msg.chat.id, tmpResponse);
+    this.telegramBot.sendMessage(msg.chat.id, RESP_START);
+    this.telegramBot.sendMessage(msg.chat.id, RESP_START_SECOND_TEST_MODE);
 
     if (msg.from?.language_code !== 'ru') {
       return;
     }
 
-    const fuckRussiansResponse = `Доречі, ми помітили, що у тебе в Telegram встановлена російська мова${EMOJ_POOP}.\nЗакликаємо натомість перейти на солов‘їну, адже українська мова - найкраща!${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
-
-    this.telegramBot.sendMessage(msg.chat.id, fuckRussiansResponse);
+    this.telegramBot.sendMessage(msg.chat.id, RESP_FUCK_RU);
   }
 
   private async handleCurrentCommand(msg: TelegramBot.Message): Promise<void> {
@@ -99,10 +126,7 @@ export class BotService {
       });
 
     if (!latest) {
-      this.telegramBot.sendMessage(
-        msg.chat.id,
-        `Нажаль, наразі інформація щодо наявності світла в ${PLACE} відсутня.`
-      );
+      this.telegramBot.sendMessage(msg.chat.id, RESP_NO_CURRENT_INFO);
 
       return;
     }
@@ -115,8 +139,8 @@ export class BotService {
       includeSeconds: false,
     });
     const response = latest.isAvailable
-      ? `${EMOJ_BULB} Наразі все добре - світло в ${PLACE} є!\nВключення відбулося ${when}.\nСвітло є вже ${howLong}.\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`
-      : `${EMOJ_MOON} Нажаль, наразі світла в ${PLACE} нема.\nВимкнення відбулося ${when}.\nСвітло відсутнє вже ${howLong}.\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nПідтримати українську армію можна тут @Donate1024Bot`;
+      ? RESP_CURRENTLY_AVAILABLE({ when, howLong })
+      : RESP_CURRENTLY_UNAVAILABLE({ when, howLong });
 
     this.telegramBot.sendMessage(msg.chat.id, response);
   }
@@ -130,8 +154,8 @@ export class BotService {
       chatId: msg.chat.id,
     });
     const response = added
-      ? `Підписка створена - ти будеш отримувати повідомлення кожного разу після зміни ситуації зі світлом в ${PLACE}.\nТи завжди можеш відписатися за допомогою команди /unsubscribe.`
-      : `Підписка вже створена і ти вже отримуєш повідомлення кожного разу після зміни ситуації зі світлом в ${PLACE}.\nТи завжди можеш відписатися за допомогою команди /unsubscribe.`;
+      ? RESP_SUBSCRIPTION_CREATED
+      : RESP_SUBSCRIPTION_ALREADY_EXISTS;
 
     this.telegramBot.sendMessage(msg.chat.id, response);
   }
@@ -144,9 +168,7 @@ export class BotService {
     const removed = await this.userRepository.removeUserSubscription({
       chatId: msg.chat.id,
     });
-    const response = removed
-      ? `Підписка скасована - ти більше не будеш отримувати повідомлення щодо зміни ситуації зі світлом в ${PLACE}.`
-      : `Підписка і так відсутня, ти зараз не отримуєш повідомлення щодо зміни ситуації зі світлом в ${PLACE}.`;
+    const response = removed ? RESP_UNSUBSCRIBED : RESP_WAS_NOT_SUBSCRIBED;
 
     this.telegramBot.sendMessage(msg.chat.id, response);
   }
@@ -298,9 +320,7 @@ export class BotService {
   }
 
   private async handleAboutCommand(msg: TelegramBot.Message): Promise<void> {
-    const response = `Якщо вам подобається цей бот - можете подякувати донатом на підтримку української армії @Donate1024Bot.\n${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\nБажано автора зайвий раз не турбувати, дякую.`;
-
-    this.telegramBot.sendMessage(msg.chat.id, response);
+    this.telegramBot.sendMessage(msg.chat.id, RESP_ABOUT);
   }
 
   private async notifyAllSubscribersAboutElectricityAvailabilityChange(): Promise<void> {
@@ -331,8 +351,8 @@ export class BotService {
 
     if (!previous) {
       response = latest.isAvailable
-        ? `${EMOJ_BULB} ${when}\nЮхууу, світло в ${PLACE} включили!\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`
-        : `${EMOJ_MOON} ${when}\nЙой, світло в ${PLACE} вимкнено!\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nПідтримати українську армію можна тут @Donate1024Bot`;
+        ? RESP_ENABLED_SHORT({ when })
+        : RESP_DISABLED_SHORT({ when });
     } else {
       const previousTime = convertToTimeZone(previous.time, {
         timeZone: TIME_ZONE,
@@ -343,8 +363,8 @@ export class BotService {
       });
 
       response = latest.isAvailable
-        ? `${EMOJ_BULB} ${when}\nЮхууу, світло в ${PLACE} включили!\nСвітло було відсутнє ${howLong}.\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`
-        : `${EMOJ_MOON} ${when}\nЙой, світло в ${PLACE} вимкнено!\nМи насолоджувалися світлом ${howLong}.\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nПідтримати українську армію можна тут @Donate1024Bot`;
+        ? RESP_ENABLED_DETAILED({ when, howLong })
+        : RESP_DISABLED_DETAILED({ when, howLong });
     }
 
     subscribers.forEach(({ chatId }) => {
