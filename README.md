@@ -7,6 +7,11 @@ Pet project to track information about electricity outages.
 - install NodeJS, nvm, flyctl
 - `nvm use`
 - `npm ci`
+- see [https://fly.io/docs](https://fly.io/docs)
+- create fly apps with `electrobot` and `electrobotstg` names
+- crate `pg-electro-bot` and `pg-electro-bot-stg` fly Postgres clusters for prod and stg envs
+- attach apps to corresponding Postgres clusters
+- set secrests for prod and stg envs (see **apps/electro-bot/.env.example**)
 
 ## Run in local dev env mode
 
@@ -18,18 +23,21 @@ Pet project to track information about electricity outages.
 - `npm run migrate:electro-bot` to apply migrations
 - `npx knex migrate:make some_migration_name` to create new migration
 
-## Connect to prod Postgre
+## Connect to remote Postgre
 
-`flyctl proxy 5433 -a pg-electro-bot`
-
-## Disable/enable
-
-- `flyctl scale count 0` to disable
-- `flyctl scale count 1` to enable
+Staging: `flyctl proxy 5433 -a pg-electro-bot-stg`, production: `flyctl proxy 5433 -a pg-electro-bot`.
 
 ## Deploy
 
-TODO: this is tmp solution, come up with normal flow.
+TODO: this is tmp solution that causes downtime during deployment, come up with normal flow.
+
+Staging:
+
+- `flyctl --config fly.stg.toml scale count 0`
+- `flyctl --config fly.stg.toml deploy`
+- `flyctl --config fly.stg.toml scale count 1`
+
+Production:
 
 - `flyctl scale count 0`
 - `flyctl deploy`
@@ -37,7 +45,11 @@ TODO: this is tmp solution, come up with normal flow.
 
 ## Restart
 
-- `flyctl apps restart electrobot`
+Staging: `flyctl apps restart electrobotstg`, production: `flyctl apps restart electrobot`.
+
+## Logs
+
+Staging: `flyctl --config fly.stg.toml logs`, production: `flyctl logs`.
 
 ## Recreate builder
 

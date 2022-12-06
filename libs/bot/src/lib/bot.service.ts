@@ -22,6 +22,9 @@ const EMOJ_MOON = Emoji.get(Emoji.emoji['new_moon_with_face']);
 const EMOJ_KISS = Emoji.get(Emoji.emoji['kiss']);
 const EMOJ_KISS_HEART = Emoji.get(Emoji.emoji['kissing_heart']);
 
+const MSG_DISABLED_REASON = `Причина вимкнення - йо#ана русня!${EMOJ_POOP}`;
+const MSG_DISABLED_SUFFIX = 'Скеруй лють до русні підтримавши українську армію!\nОсь один із зручних способів зробити донат: @Donate1024Bot.';
+
 const RESP_START = `Привіт! Цей бот допомогає моніторити ситуацію зі світлом (електроенергією) в ${PLACE}.\n\nЗа допомогою команди /current ти завжди можеш дізнатися чи є зараз в кварталі світло і як довго це триває.\n\nКоманда /subscribe дозволяє підписатися на сповіщення щодо зміни ситуації (відключення/включення).\n\nЗа допомогою команди /stats можна переглянути статистику (звіт по включенням/відключенням за поточну і попередню добу, сумарний час наявності/відсутності світла).\n${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
 const RESP_START_SECOND_TEST_MODE =
   'Бот поки що працює в тестовому режимі, тому ми заздалегідь просимо пробачити можливі помилки і глюки.\nЗ часом вони всі будуть виправлені.';
@@ -36,26 +39,26 @@ const RESP_CURRENTLY_UNAVAILABLE = (params: {
   readonly when: string;
   readonly howLong: string;
 }) =>
-  `${EMOJ_MOON} Нажаль, наразі світла в ${PLACE} нема.\nВимкнення відбулося ${params.when}.\nСвітло відсутнє вже ${params.howLong}.\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nСкеруйте лють до русні підтримавши українську армію!\nОсь один із зручних способів зробити донат: @Donate1024Bot.`;
+  `${EMOJ_MOON} Нажаль, наразі світла в ${PLACE} нема.\nВимкнення відбулося ${params.when}.\nСвітло відсутнє вже ${params.howLong}.\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_SUFFIX}`;
 const RESP_SUBSCRIPTION_CREATED = `Підписка створена - ти будеш отримувати повідомлення кожного разу після зміни ситуації зі світлом в ${PLACE}.\nТи завжди можеш відписатися за допомогою команди /unsubscribe.`;
 const RESP_SUBSCRIPTION_ALREADY_EXISTS = `Підписка вже створена і ти вже отримуєш повідомлення кожного разу після зміни ситуації зі світлом в ${PLACE}.\nТи завжди можеш відписатися за допомогою команди /unsubscribe.`;
 const RESP_UNSUBSCRIBED = `Підписка скасована - ти більше не будеш отримувати повідомлення щодо зміни ситуації зі світлом в ${PLACE}.`;
 const RESP_WAS_NOT_SUBSCRIBED = `Підписка і так відсутня, ти зараз не отримуєш повідомлення щодо зміни ситуації зі світлом в ${PLACE}.`;
 const RESP_ABOUT = `Якщо вам подобається цей бот - можете подякувати донатом на підтримку української армії @Donate1024Bot.\n\n${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\n\nhttps://github.com/zd333/electro_bot\n\nhttps://www.instagram.com/oleksandr_changli/`;
 const RESP_ENABLED_SHORT = (params: { readonly when: string }) =>
-  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${PLACE} включили!\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${PLACE} включили!\n\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
 const RESP_DISABLED_SHORT = (params: { readonly when: string }) =>
-  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${PLACE} вимкнено!\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nСкеруйте лють до русні підтримавши українську армію!\n Ось один із зручних способів зробити донат: @Donate1024Bot.`;
+  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${PLACE} вимкнено!\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_SUFFIX}`;
 const RESP_ENABLED_DETAILED = (params: {
   readonly when: string;
   readonly howLong: string;
 }) =>
-  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${PLACE} включили!\nСвітло було відсутнє ${params.howLong}.\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${PLACE} включили!\nСвітло було відсутнє ${params.howLong}.\n\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
 const RESP_DISABLED_DETAILED = (params: {
   readonly when: string;
   readonly howLong: string;
 }) =>
-  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${PLACE} вимкнено!\nМи насолоджувалися світлом ${params.howLong}.\nПричина вимкнення - йо#ана русня${EMOJ_POOP}!\nСкеруйте лють до русні підтримавши українську армію!\n Ось один із зручних способів зробити донат: @Donate1024Bot.`;
+  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${PLACE} вимкнено!\nМи насолоджувалися світлом ${params.howLong}.\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_SUFFIX}`;
 
 @Injectable()
 export class BotService {
@@ -315,6 +318,8 @@ export class BotService {
     if (response === '') {
       response = 'Наразі інформація відсутня.';
     }
+
+    response += `\n\n${MSG_DISABLED_SUFFIX}`;
 
     this.telegramBot.sendMessage(msg.chat.id, response);
   }
