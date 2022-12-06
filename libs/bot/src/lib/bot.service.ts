@@ -8,12 +8,14 @@ import {
   formatDistance,
 } from 'date-fns';
 import { convertToTimeZone } from 'date-fns-timezone';
-import { ms, uk } from 'date-fns/locale';
+import { uk } from 'date-fns/locale';
 import * as TelegramBot from 'node-telegram-bot-api';
 import * as Emoji from 'node-emoji';
 
 const TIME_ZONE = process.env.PLACE_TIMEZONE as string;
 const PLACE = process.env.PLACE_NAME as string;
+
+const GROUP_MIN_MSG_FREQUENCY = 10 * 60 * 1000; // 10 min
 
 const EMOJ_UA = Emoji.get(Emoji.emoji['flag-ua']);
 const EMOJ_POOP = Emoji.get(Emoji.emoji['poop']);
@@ -64,6 +66,7 @@ const RESP_DISABLED_DETAILED = (params: {
 export class BotService {
   private readonly logger = new Logger(BotService.name);
   private readonly telegramBot: TelegramBot;
+  private groupStatsLatMessageTimestamps: Record<number, number | undefined> = {};
 
   constructor(
     private readonly electricityAvailabilityService: ElectricityAvailabilityService,
@@ -128,9 +131,18 @@ export class BotService {
 
   private async handleCurrentCommand(msg: TelegramBot.Message): Promise<void> {
     if (this.isGroup({ chatId: msg.chat.id })) {
-      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+      const lastMsgTime = this.groupStatsLatMessageTimestamps[msg.chat.id];
 
-      return;
+      if (lastMsgTime) {
+        const currentTime = Date.now();
+        const eraliestAllowedTime = lastMsgTime + GROUP_MIN_MSG_FREQUENCY;
+
+        if (currentTime < eraliestAllowedTime) {
+          this.logger.warn(`Skipping group stats message due to too frequent: ${JSON.stringify(msg)}`);
+
+          return;
+        }
+      }
     }
 
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
@@ -203,9 +215,18 @@ export class BotService {
   // TODO: refactor (make cleaner)
   private async handleStatsCommand(msg: TelegramBot.Message): Promise<void> {
     if (this.isGroup({ chatId: msg.chat.id })) {
-      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+      const lastMsgTime = this.groupStatsLatMessageTimestamps[msg.chat.id];
 
-      return;
+      if (lastMsgTime) {
+        const currentTime = Date.now();
+        const eraliestAllowedTime = lastMsgTime + GROUP_MIN_MSG_FREQUENCY;
+
+        if (currentTime < eraliestAllowedTime) {
+          this.logger.warn(`Skipping group stats message due to too frequent: ${JSON.stringify(msg)}`);
+
+          return;
+        }
+      }
     }
 
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
@@ -352,6 +373,11 @@ export class BotService {
     response += `\n\n${MSG_DISABLED_SUFFIX}`;
 
     this.telegramBot.sendMessage(msg.chat.id, response);
+
+    this.groupStatsLatMessageTimestamps = {
+      ...this.groupStatsLatMessageTimestamps,
+      [msg.chat.id]: Date.now(),
+    }
   }
 
   private async handleAboutCommand(msg: TelegramBot.Message): Promise<void> {
