@@ -8,7 +8,7 @@ import {
   formatDistance,
 } from 'date-fns';
 import { convertToTimeZone } from 'date-fns-timezone';
-import { uk } from 'date-fns/locale';
+import { ms, uk } from 'date-fns/locale';
 import * as TelegramBot from 'node-telegram-bot-api';
 import * as Emoji from 'node-emoji';
 
@@ -108,6 +108,12 @@ export class BotService {
   }
 
   private async handleStartCommand(msg: TelegramBot.Message): Promise<void> {
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
     this.telegramBot.sendMessage(msg.chat.id, RESP_START);
@@ -121,6 +127,12 @@ export class BotService {
   }
 
   private async handleCurrentCommand(msg: TelegramBot.Message): Promise<void> {
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
     const [latest] =
@@ -151,6 +163,12 @@ export class BotService {
   private async handleSubscribeCommand(
     msg: TelegramBot.Message
   ): Promise<void> {
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
     const added = await this.userRepository.addUserSubscription({
@@ -166,6 +184,12 @@ export class BotService {
   private async handleUnsubscribeCommand(
     msg: TelegramBot.Message
   ): Promise<void> {
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
     const removed = await this.userRepository.removeUserSubscription({
@@ -178,6 +202,12 @@ export class BotService {
 
   // TODO: refactor (make cleaner)
   private async handleStatsCommand(msg: TelegramBot.Message): Promise<void> {
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
     const stats = await this.electricityAvailabilityService.getStats({
@@ -325,6 +355,12 @@ export class BotService {
   }
 
   private async handleAboutCommand(msg: TelegramBot.Message): Promise<void> {
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
     this.telegramBot.sendMessage(msg.chat.id, RESP_ABOUT);
   }
 
@@ -387,5 +423,9 @@ export class BotService {
     this.logger.verbose(
       `Finished notifying all ${subscribers.length} subscribers about electricity availability change`
     );
+  }
+
+  private isGroup(params: { readonly chatId: number }): boolean {
+    return params.chatId < 0;
   }
 }
