@@ -5,15 +5,13 @@ import { Subject } from 'rxjs';
 import {
   startOfToday,
   startOfYesterday,
-  startOfWeek,
-  startOfMonth,
-  subDays,
 } from 'date-fns';
 import { convertToLocalTime, convertToTimeZone } from 'date-fns-timezone';
 import { HistoryItem } from './history-item.type';
 
 const HOST = process.env.HOST_TO_CHECK_AVAILABILITY as string;
-const PING_RETRY_ATTEMPTS = 5;
+const TRESHOLD_TIME = 4 * 60 * 1000; // 4 min
+
 @Injectable()
 export class ElectricityAvailabilityService {
   private readonly logger = new Logger(ElectricityAvailabilityService.name);
@@ -27,16 +25,19 @@ export class ElectricityAvailabilityService {
   // TODO: add threshold logic to filter fake electricity disabled events due to network (ping) issues
   public async checkAndSaveElectricityAvailabilityState(): Promise<void> {
     let alive = false;
-    let attempts = 0;
+    let currentTime = Date.now();
+    const finishTime = currentTime + TRESHOLD_TIME;
 
-    while (!alive && attempts <= PING_RETRY_ATTEMPTS) {
-      const res = await ping.promise.probe(HOST, {
-        timeout: 5,
-        deadline: 10,
-      });
+    while (!alive && currentTime < finishTime) {
+      const res = await ping.promise.probe(HOST);
 
       alive = res.alive;
-      attempts++;
+
+      if (!alive) {
+        await this.sleep({ ms: 30 * 1000 });
+      }
+
+      currentTime = Date.now();
     }
 
     const [latest] = await this.electricityRepository.getLatestAvailability({
@@ -44,9 +45,6 @@ export class ElectricityAvailabilityService {
     });
 
     if (latest?.isAvailable === alive) {
-      // this.logger.verbose(
-      //   `Current availability state (${alive}) haven't changed, skipping save`
-      // );
 
       return;
     }
@@ -162,5 +160,9 @@ export class ElectricityAvailabilityService {
     }));
 
     return [first, ...middle, last];
+  }
+
+  private async sleep(params: { readonly ms: number }): Promise<void> {
+    new Promise(r => setTimeout(r, params.ms));
   }
 }
