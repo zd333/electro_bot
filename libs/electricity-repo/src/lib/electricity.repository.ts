@@ -2,11 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectKnex, Knex } from 'nestjs-knex';
 import type { Knex as RawKnex } from 'knex';
 
+// TODO: update availability table: make place ID column reference after version 0.2.0 released
+
 @Injectable()
 export class ElectricityRepository {
   constructor(@InjectKnex() private readonly knex: Knex) {}
 
   public async getLatestAvailability(params: {
+    readonly placeId: string;
     readonly limit?: number;
     readonly from?: Date;
     readonly till?: Date;
@@ -16,7 +19,7 @@ export class ElectricityRepository {
       readonly isAvailable: boolean;
     }>
   > {
-    const { limit, from, till } = params;
+    const { placeId, limit, from, till } = params;
     const whereBuilder = (builder: RawKnex.QueryBuilder) => {
       if (from) {
         builder.andWhere('created_at', '>=', from);
@@ -34,6 +37,7 @@ export class ElectricityRepository {
           >('*')
           .from('availability')
           .where(whereBuilder)
+          .andWhere({ place_id: placeId })
           .limit(limit)
           .offset(0)
           .orderBy('created_at', 'desc')
@@ -43,6 +47,7 @@ export class ElectricityRepository {
           >('*')
           .from('availability')
           .where(whereBuilder)
+          .andWhere({ place_id: placeId })
           .orderBy('created_at', 'desc');
     const queryRes = await query;
 
@@ -53,9 +58,11 @@ export class ElectricityRepository {
   }
 
   public async saveAvailability(params: {
+    readonly placeId: string;
     readonly isAvailable: boolean;
   }): Promise<void> {
     await this.knex.table('availability').insert({
+      place_id: params.placeId,
       is_available: params.isAvailable,
       created_at: new Date(),
     });

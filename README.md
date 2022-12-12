@@ -31,6 +31,8 @@ Staging: `flyctl proxy 5433 -a pg-electro-bot-stg`, production: `flyctl proxy 54
 
 TODO: this is tmp solution that causes downtime during deployment, come up with normal flow.
 
+!Always deploy staging env first (this minimizes prod downtime since all images are already built).
+
 Staging:
 
 - `flyctl --config fly.stg.toml scale count 0`

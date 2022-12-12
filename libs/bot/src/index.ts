@@ -1,2 +1,2 @@
-export * from './lib/bot.service';
+export * from './lib/notification-bot.service';
 export * from './lib/bot.module';

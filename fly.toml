@@ -7,9 +7,6 @@ processes = []
 
 [env]
   NODE_ENV = "production"
-  HOST_TO_CHECK_AVAILABILITY = "94.45.154.74"
-  PLACE_NAME = "У-квартал"
-  PLACE_TIMEZONE = "Europe/Kiev"
   DB_HOST = "top2.nearest.of.pg-electro-bot.internal"
   DB_NAME = "electrobot"
   DB_USER = "electrobot"

@@ -1,0 +1,611 @@
+import { ElectricityAvailabilityService } from '@electrobot/electricity-availability';
+import { UserRepository } from '@electrobot/user-repo';
+import { Injectable, Logger } from '@nestjs/common';
+import {
+  addMinutes,
+  differenceInMinutes,
+  format,
+  formatDistance,
+} from 'date-fns';
+import { convertToTimeZone } from 'date-fns-timezone';
+import { uk } from 'date-fns/locale';
+import * as TelegramBot from 'node-telegram-bot-api';
+import * as Emoji from 'node-emoji';
+import { Bot, Place, VERSION } from '@electrobot/domain';
+import { PlaceRepository } from '@electrobot/place-repo';
+
+const EMOJ_UA = Emoji.get(Emoji.emoji['flag-ua']);
+const EMOJ_POOP = Emoji.get(Emoji.emoji['poop']);
+const EMOJ_BULB = Emoji.get(Emoji.emoji['bulb']);
+const EMOJ_MOON = Emoji.get(Emoji.emoji['new_moon_with_face']);
+const EMOJ_KISS = Emoji.get(Emoji.emoji['kiss']);
+const EMOJ_KISS_HEART = Emoji.get(Emoji.emoji['kissing_heart']);
+
+const MSG_DISABLED_REASON = `Причина вимкнення - йо#ана русня!${EMOJ_POOP}`;
+const MSG_DISABLED_SUFFIX =
+  'Скеруй лють до русні підтримавши українську армію!\n' +
+  'Ось один із зручних способів зробити донат: @Donate1024Bot.';
+
+const RESP_START = (params: { readonly place: string }) =>
+  `Привіт! Цей бот допомогає моніторити ситуацію зі світлом (електроенергією) в ${params.place}.\n\n` +
+  `За допомогою команди /current ти завжди можеш дізнатися чи є зараз в кварталі світло і як довго це триває.\n\n` +
+  `Команда /subscribe дозволяє підписатися на сповіщення щодо зміни ситуації (відключення/включення).\n\n` +
+  `За допомогою команди /stats можна переглянути статистику (звіт по включенням/` +
+  `відключенням за поточну і попередню добу, сумарний час наявності/відсутності світла).\n\n` +
+  `Контроль наявності світла відбувається за допомогою перевірки наявності Інтернет зв‘язку з провайдером ${params.place}, тому в разі проблем з Інтернетом бот може видавати невірну інформацію.\n\n` +
+  `${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+const RESP_START_SECOND_TEST_MODE =
+  'Бот поки що працює в тестовому режимі, тому ми заздалегідь просимо пробачити можливі помилки і глюки.\n' +
+  'З часом вони всі будуть виправлені.';
+const RESP_NO_CURRENT_INFO = (params: { readonly place: string }) =>
+  `Нажаль, наразі інформація щодо наявності світла в ${params.place} відсутня.`;
+const RESP_CURRENTLY_AVAILABLE = (params: {
+  readonly when: string;
+  readonly howLong: string;
+  readonly place: string;
+}) =>
+  `${EMOJ_BULB} Наразі все добре - світло в ${params.place} є!\nВключення відбулося ${params.when}.\n` +
+  `Світло є вже ${params.howLong}.\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+const RESP_CURRENTLY_UNAVAILABLE = (params: {
+  readonly when: string;
+  readonly howLong: string;
+  readonly place: string;
+}) =>
+  `${EMOJ_MOON} Нажаль, наразі світла в ${params.place} нема.\nВимкнення відбулося ${params.when}.\n` +
+  `Світло відсутнє вже ${params.howLong}.\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_SUFFIX}`;
+const RESP_SUBSCRIPTION_CREATED = (params: { readonly place: string }) =>
+  `Підписка створена - ти будеш отримувати повідомлення кожного разу після зміни ситуації зі світлом в ${params.place}.\n` +
+  `Ти завжди можеш відписатися за допомогою команди /unsubscribe.`;
+const RESP_SUBSCRIPTION_ALREADY_EXISTS = (params: { readonly place: string }) =>
+  `Підписка вже створена і ти вже отримуєш повідомлення кожного разу після зміни ситуації зі світлом в ${params.place}.\n` +
+  `Ти завжди можеш відписатися за допомогою команди /unsubscribe.`;
+const RESP_UNSUBSCRIBED = (params: { readonly place: string }) =>
+  `Підписка скасована - ти більше не будеш отримувати повідомлення щодо зміни ситуації зі світлом в ${params.place}.`;
+const RESP_WAS_NOT_SUBSCRIBED = (params: { readonly place: string }) =>
+  `Підписка і так відсутня, ти зараз не отримуєш повідомлення щодо зміни ситуації зі світлом в ${params.place}.`;
+const RESP_ABOUT = `Версія ${VERSION}\n\n`
+  +`Якщо вам подобається цей бот - можете подякувати донатом на підтримку української армії @Donate1024Bot.\n\n`
+  +`${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\n`
+  +`https://www.instagram.com/oleksandr_changli/\n\n`
+  +`https://github.com/zd333/electro_bot`;
+const RESP_ENABLED_SHORT = (params: {
+  readonly when: string;
+  readonly place: string;
+}) =>
+  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${params.place} включили!\n\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+const RESP_DISABLED_SHORT = (params: {
+  readonly when: string;
+  readonly place: string;
+}) =>
+  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params} вимкнено!\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_SUFFIX}`;
+const RESP_ENABLED_DETAILED = (params: {
+  readonly when: string;
+  readonly howLong: string;
+  readonly place: string;
+}) =>
+  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${params.place} включили!\nСвітло було відсутнє ${params.howLong}.\n\n` +
+  `Слава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+const RESP_DISABLED_DETAILED = (params: {
+  readonly when: string;
+  readonly howLong: string;
+  readonly place: string;
+}) =>
+  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params.place} вимкнено!\n` +
+  `Ми насолоджувалися світлом ${params.howLong}.\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_SUFFIX}`;
+
+@Injectable()
+export class NotificationBotService {
+  private readonly logger = new Logger(NotificationBotService.name);
+  private places: Record<string, Place> = {};
+  private placeBots: Record<
+    string,
+    {
+      readonly bot: Bot;
+      readonly telegramBot: TelegramBot;
+    }
+  > = {};
+  private isRefreshingPlacesAndBots = false;
+
+  constructor(
+    private readonly electricityAvailabilityService: ElectricityAvailabilityService,
+    private readonly userRepository: UserRepository,
+    private readonly placeRepository: PlaceRepository
+  ) {
+    this.refreshAllPlacesAndBots();
+
+    const refreshRate = 30 * 60 * 1000; // 30 min
+
+    setInterval(() => this.refreshAllPlacesAndBots(), refreshRate);
+
+    this.electricityAvailabilityService.availabilityChange$.subscribe(
+      ({ placeId }) => {
+        this.notifyAllPlaceSubscribersAboutElectricityAvailabilityChange({
+          placeId,
+        });
+      }
+    );
+  }
+
+  private async handleStartCommand(params: {
+    readonly msg: TelegramBot.Message;
+    readonly place: Place;
+    readonly bot: Bot;
+    readonly telegramBot: TelegramBot;
+  }): Promise<void> {
+    const { msg, place, telegramBot } = params;
+
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
+    this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
+
+    telegramBot.sendMessage(msg.chat.id, RESP_START({ place: place.name }));
+    telegramBot.sendMessage(msg.chat.id, RESP_START_SECOND_TEST_MODE);
+  }
+
+  private async handleCurrentCommand(params: {
+    readonly msg: TelegramBot.Message;
+    readonly place: Place;
+    readonly bot: Bot;
+    readonly telegramBot: TelegramBot;
+  }): Promise<void> {
+    const { msg, place, telegramBot } = params;
+
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
+    this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
+
+    const [latest] =
+      await this.electricityAvailabilityService.getLatestPlaceAvailability({
+        placeId: place.id,
+        limit: 1,
+      });
+
+    if (!latest) {
+      telegramBot.sendMessage(
+        msg.chat.id,
+        RESP_NO_CURRENT_INFO({ place: place.name })
+      );
+
+      return;
+    }
+
+    const changeTime = convertToTimeZone(latest.time, {
+      timeZone: place.timezone,
+    });
+    const now = convertToTimeZone(new Date(), { timeZone: place.timezone });
+    const when = format(changeTime, 'd MMMM о HH:mm', { locale: uk });
+    const howLong = formatDistance(now, changeTime, {
+      locale: uk,
+      includeSeconds: false,
+    });
+    const response = latest.isAvailable
+      ? RESP_CURRENTLY_AVAILABLE({ when, howLong, place: place.name })
+      : RESP_CURRENTLY_UNAVAILABLE({ when, howLong, place: place.name });
+
+    telegramBot.sendMessage(msg.chat.id, response);
+  }
+
+  private async handleSubscribeCommand(params: {
+    readonly msg: TelegramBot.Message;
+    readonly place: Place;
+    readonly bot: Bot;
+    readonly telegramBot: TelegramBot;
+  }): Promise<void> {
+    const { msg, place, telegramBot } = params;
+
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
+    this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
+
+    const added = await this.userRepository.addUserSubscription({
+      placeId: place.id,
+      chatId: msg.chat.id,
+    });
+    const response = added
+      ? RESP_SUBSCRIPTION_CREATED({ place: place.name })
+      : RESP_SUBSCRIPTION_ALREADY_EXISTS({ place: place.name });
+
+    telegramBot.sendMessage(msg.chat.id, response);
+  }
+
+  private async handleUnsubscribeCommand(params: {
+    readonly msg: TelegramBot.Message;
+    readonly place: Place;
+    readonly bot: Bot;
+    readonly telegramBot: TelegramBot;
+  }): Promise<void> {
+    const { msg, place, telegramBot } = params;
+
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
+    this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
+
+    const removed = await this.userRepository.removeUserSubscription({
+      placeId: place.id,
+      chatId: msg.chat.id,
+    });
+    const response = removed
+      ? RESP_UNSUBSCRIBED({ place: place.name })
+      : RESP_WAS_NOT_SUBSCRIBED({ place: place.name });
+
+    telegramBot.sendMessage(msg.chat.id, response);
+  }
+
+  // TODO: refactor (make cleaner)
+  private async handleStatsCommand(params: {
+    readonly msg: TelegramBot.Message;
+    readonly place: Place;
+    readonly bot: Bot;
+    readonly telegramBot: TelegramBot;
+  }): Promise<void> {
+    const { msg, place, telegramBot } = params;
+
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
+    this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
+
+    const stats = await this.electricityAvailabilityService.getPlaceStats({
+      place,
+    });
+
+    let response = '';
+
+    if (
+      !!stats.history.yesterday?.length &&
+      stats.history.yesterday?.length > 1
+    ) {
+      if (response.length > 0) {
+        response += '\n\n';
+      }
+
+      response += `${EMOJ_KISS} Вчора:`;
+
+      const yesterday = stats.history.yesterday;
+
+      const baseDate = new Date();
+      let baseDatePlusAvailable = new Date();
+      let baseDatePluesUnavailable = new Date();
+
+      yesterday.forEach(({ start, end, isEnabled }) => {
+        const durationInMinutes = differenceInMinutes(start, end);
+
+        if (isEnabled) {
+          baseDatePlusAvailable = addMinutes(
+            baseDatePlusAvailable,
+            durationInMinutes
+          );
+        } else {
+          baseDatePluesUnavailable = addMinutes(
+            baseDatePluesUnavailable,
+            durationInMinutes
+          );
+        }
+      });
+
+      const howLongAvailable = formatDistance(baseDatePlusAvailable, baseDate, {
+        locale: uk,
+        includeSeconds: false,
+      });
+      const howLongUnavailable = formatDistance(
+        baseDatePluesUnavailable,
+        baseDate,
+        {
+          locale: uk,
+          includeSeconds: false,
+        }
+      );
+
+      response = `${response}\nЗі світлом: ${howLongAvailable}\nБез світла: ${howLongUnavailable}`;
+
+      yesterday.forEach(({ start, end, isEnabled }, i) => {
+        const emoji = isEnabled ? EMOJ_BULB : EMOJ_MOON;
+        const s = format(start, 'HH:mm', { locale: uk });
+        const e = format(end, 'HH:mm', { locale: uk });
+        const duration = formatDistance(end, start, {
+          locale: uk,
+          includeSeconds: false,
+        });
+        const entry =
+          i === 0
+            ? `${emoji} до ${e}`
+            : i === yesterday.length - 1
+            ? `${emoji} з ${s}`
+            : `${emoji} ${s}-${e} (${duration})`;
+
+        response = `${response}\n${entry}`;
+      });
+    }
+
+    if (!!stats.history.today?.length && stats.history.today?.length > 1) {
+      if (response.length > 0) {
+        response += '\n\n';
+      }
+
+      response += `${EMOJ_KISS_HEART} Сьогодні:`;
+
+      const today = stats.history.today;
+
+      const baseDate = new Date();
+      let baseDatePlusAvailable = new Date();
+      let baseDatePluesUnavailable = new Date();
+
+      today.forEach(({ start, end, isEnabled }) => {
+        const durationInMinutes = differenceInMinutes(start, end);
+
+        if (isEnabled) {
+          baseDatePlusAvailable = addMinutes(
+            baseDatePlusAvailable,
+            durationInMinutes
+          );
+        } else {
+          baseDatePluesUnavailable = addMinutes(
+            baseDatePluesUnavailable,
+            durationInMinutes
+          );
+        }
+      });
+
+      const howLongAvailable = formatDistance(baseDatePlusAvailable, baseDate, {
+        locale: uk,
+        includeSeconds: false,
+      });
+      const howLongUnavailable = formatDistance(
+        baseDatePluesUnavailable,
+        baseDate,
+        {
+          locale: uk,
+          includeSeconds: false,
+        }
+      );
+
+      response = `${response}\nЗі світлом: ${howLongAvailable}\nБез світла: ${howLongUnavailable}`;
+
+      today.forEach(({ start, end, isEnabled }, i) => {
+        const emoji = isEnabled ? EMOJ_BULB : EMOJ_MOON;
+        const s = format(start, 'HH:mm', { locale: uk });
+        const e = format(end, 'HH:mm', { locale: uk });
+        const duration = formatDistance(end, start, {
+          locale: uk,
+          includeSeconds: false,
+        });
+        const entry =
+          i === 0
+            ? `${emoji} до ${e}`
+            : i === today.length - 1
+            ? `${emoji} з ${s}`
+            : `${emoji} ${s}-${e} (${duration})`;
+
+        response = `${response}\n${entry}`;
+      });
+    }
+
+    if (response === '') {
+      response = 'Наразі інформація відсутня.';
+    }
+
+    response += `\n\n${MSG_DISABLED_SUFFIX}`;
+
+    telegramBot.sendMessage(msg.chat.id, response);
+  }
+
+  private async handleAboutCommand(params: {
+    readonly msg: TelegramBot.Message;
+    readonly place: Place;
+    readonly bot: Bot;
+    readonly telegramBot: TelegramBot;
+  }): Promise<void> {
+    const { msg, place, telegramBot } = params;
+
+    if (this.isGroup({ chatId: msg.chat.id })) {
+      this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
+    telegramBot.sendMessage(msg.chat.id, RESP_ABOUT);
+  }
+
+  private async notifyAllPlaceSubscribersAboutElectricityAvailabilityChange(params: {
+    readonly placeId: string;
+  }): Promise<void> {
+    const { placeId } = params;
+
+    const place = this.places[placeId];
+
+    if (!place) {
+      this.logger.error(
+        `Place ${placeId} not fount in memory cache - skipping subscriber notification`
+      );
+
+      return;
+    }
+
+    const botEntry = this.placeBots[placeId];
+
+    if (!botEntry) {
+      this.logger.log(
+        `No bot for ${place.name} - no subscriber notification performed`
+      );
+
+      return;
+    }
+
+    const subscribers = await this.userRepository.getAllPlaceUserSubscriptions({
+      placeId,
+    });
+
+    this.logger.verbose(
+      `Notifying all ${subscribers.length} subscribers of ${place.name} about electricity availability change`
+    );
+
+    const [latest, previous] =
+      await this.electricityAvailabilityService.getLatestPlaceAvailability({
+        placeId,
+        limit: 2,
+      });
+
+    if (!latest) {
+      this.logger.error(
+        `Electricity availability changed event, however no availability data in the repo for ${place.name}`
+      );
+
+      return;
+    }
+
+    const latestTime = convertToTimeZone(latest.time, {
+      timeZone: place.timezone,
+    });
+    const when = format(latestTime, 'HH:mm dd.MM', { locale: uk });
+    let response: string;
+
+    if (!previous) {
+      response = latest.isAvailable
+        ? RESP_ENABLED_SHORT({ when, place: place.name })
+        : RESP_DISABLED_SHORT({ when, place: place.name });
+    } else {
+      const previousTime = convertToTimeZone(previous.time, {
+        timeZone: place.timezone,
+      });
+      const howLong = formatDistance(latestTime, previousTime, {
+        locale: uk,
+        includeSeconds: false,
+      });
+
+      response = latest.isAvailable
+        ? RESP_ENABLED_DETAILED({ when, howLong, place: place.name })
+        : RESP_DISABLED_DETAILED({ when, howLong, place: place.name });
+    }
+
+    subscribers.forEach(({ chatId }) => {
+      try {
+        botEntry.telegramBot.sendMessage(chatId, response);
+      } catch (e) {
+        this.logger.error(
+          `Failed to send notification to ${chatId} chat ID: ${JSON.stringify(
+            e
+          )}`
+        );
+      }
+    });
+
+    this.logger.verbose(
+      `Finished notifying all ${subscribers.length} subscribers of ${place.name} about electricity availability change`
+    );
+  }
+
+  private isGroup(params: { readonly chatId: number }): boolean {
+    return params.chatId < 0;
+  }
+
+  private async refreshAllPlacesAndBots(): Promise<void> {
+    if (this.isRefreshingPlacesAndBots) {
+      return;
+    }
+
+    this.isRefreshingPlacesAndBots = true;
+    try {
+      const places = await this.placeRepository.getAllPlaces();
+
+      this.places = places.reduce<Record<string, Place>>(
+        (res, place) => ({
+          ...res,
+          [place.id]: place,
+        }),
+        {}
+      );
+
+      const placeBots = await this.placeRepository.getAllPlaceBots();
+
+      placeBots.forEach((bot) => {
+        if (this.placeBots[bot.placeId]) {
+          // Already created, rewrite bot data (to apply enabled/disabled), but keep same Telegram bot instance
+          this.placeBots[bot.placeId] = {
+            ...this.placeBots[bot.placeId],
+            bot,
+          };
+
+          return;
+        }
+
+        const place = this.places[bot.placeId];
+
+        if (!place) {
+          this.logger.error(
+            `Place ${bot.placeId} not fount in memory cache - can not create notification bot`
+          );
+
+          return;
+        }
+
+        this.createBot({ place, bot });
+      });
+    } catch (e) {
+      //
+    }
+
+    this.isRefreshingPlacesAndBots = false;
+  }
+
+  private createBot(params: {
+    readonly place: Place;
+    readonly bot: Bot;
+  }): void {
+    const { place, bot } = params;
+    const telegramBot = new TelegramBot(bot.token, { polling: true });
+
+    // Matches /start
+    telegramBot.onText(/\/start/, (msg) =>
+      this.handleStartCommand({ msg, place, bot, telegramBot })
+    );
+
+    // Matches /current
+    telegramBot.onText(/\/current/, (msg) =>
+      this.handleCurrentCommand({ msg, place, bot, telegramBot })
+    );
+
+    // Matches /subscribe
+    telegramBot.onText(/\/subscribe/, (msg) =>
+      this.handleSubscribeCommand({ msg, place, bot, telegramBot })
+    );
+
+    // Matches /unsubscribe
+    telegramBot.onText(/\/unsubscribe/, (msg) =>
+      this.handleUnsubscribeCommand({ msg, place, bot, telegramBot })
+    );
+
+    // Matches /stop
+    telegramBot.onText(/\/stop/, (msg) =>
+      this.handleUnsubscribeCommand({ msg, place, bot, telegramBot })
+    );
+
+    // Matches /stats
+    telegramBot.onText(/\/stats/, (msg) =>
+      this.handleStatsCommand({ msg, place, bot, telegramBot })
+    );
+
+    // Matches /about
+    telegramBot.onText(/\/about/, (msg) =>
+      this.handleAboutCommand({ msg, place, bot, telegramBot })
+    );
+  }
+}

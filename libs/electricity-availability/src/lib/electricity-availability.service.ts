@@ -8,56 +8,34 @@ import {
 } from 'date-fns';
 import { convertToLocalTime, convertToTimeZone } from 'date-fns-timezone';
 import { HistoryItem } from './history-item.type';
+import { Place } from '@electrobot/domain';
+import { PlaceRepository } from '@electrobot/place-repo';
 
-const HOST = process.env.HOST_TO_CHECK_AVAILABILITY as string;
-const TRESHOLD_TIME = 4 * 60 * 1000; // 4 min
+const DEFAULT_TRESHOLD_MINUTES = 7;
 
 @Injectable()
 export class ElectricityAvailabilityService {
   private readonly logger = new Logger(ElectricityAvailabilityService.name);
-  private readonly _availabilityChange$ = new Subject<void>();
+  private readonly _availabilityChange$ = new Subject<{ readonly placeId: string }>();
+  private isCheckingPlaceAvailability: Record<string, boolean> = {};
 
   public readonly availabilityChange$ =
     this._availabilityChange$.asObservable();
 
-  constructor(private readonly electricityRepository: ElectricityRepository) {}
+  constructor(
+    private readonly electricityRepository: ElectricityRepository,
+    private readonly placeRepository: PlaceRepository,
+  ) {}
 
-  public async checkAndSaveElectricityAvailabilityState(): Promise<void> {
-    let alive = false;
-    let currentTime = Date.now();
-    const finishTime = currentTime + TRESHOLD_TIME;
+  public async checkAndSaveElectricityAvailabilityStateOfAllPlaces(): Promise<void> {
+    const places = await this.placeRepository.getAllPlaces();
+    const jobs = places.map((place) => this.checkAndSavePlaceElectricityAvailability({ place }));
 
-    while (!alive && currentTime < finishTime) {
-      const res = await ping.promise.probe(HOST);
-
-      alive = res.alive;
-
-      if (!alive) {
-        await this.sleep({ ms: 30 * 1000 });
-      }
-
-      currentTime = Date.now();
-    }
-
-    const [latest] = await this.electricityRepository.getLatestAvailability({
-      limit: 1,
-    });
-
-    if (latest?.isAvailable === alive) {
-
-      return;
-    }
-
-    await this.electricityRepository.saveAvailability({ isAvailable: alive });
-
-    this._availabilityChange$.next();
-
-    this.logger.verbose(
-      `Availability state changed from ${latest?.isAvailable} to ${alive}, saving`
-    );
+    await Promise.all(jobs);
   }
 
-  public async getLatestAvailability(params: {
+  public async getLatestPlaceAvailability(params: {
+    readonly placeId: string;
     readonly limit?: number;
   }): Promise<
     Array<{
@@ -69,27 +47,26 @@ export class ElectricityAvailabilityService {
   }
 
   // TODO: refactor (make cleaner)
-  public async getStats(params: { readonly timeZone: string }): Promise<{
+  public async getPlaceStats(params: { readonly place: Place }): Promise<{
     readonly history: {
       readonly today?: Array<HistoryItem>;
       readonly yesterday?: Array<HistoryItem>;
     };
   }> {
-    const { timeZone } = params;
-    this.logger.warn(timeZone);
+    const { place } = params;
     const now = new Date();
-    this.logger.warn(now);
-    const todayStart = convertToLocalTime(startOfToday(), { timeZone });
-    const yesterdayStart = convertToLocalTime(startOfYesterday(), { timeZone });
+    const todayStart = convertToLocalTime(startOfToday(), { timeZone: place.timezone });
+    const yesterdayStart = convertToLocalTime(startOfYesterday(), { timeZone: place.timezone });
 
     const todayData = (
       await this.electricityRepository.getLatestAvailability({
+        placeId: place.id,
         from: todayStart,
         till: now,
       })
     ).map((item) => ({
       ...item,
-      time: convertToTimeZone(item.time, { timeZone }),
+      time: convertToTimeZone(item.time, { timeZone: place.timezone }),
     }));
     const todayHistory = this.availabilityDataToHistory({
       start: todayStart,
@@ -99,12 +76,13 @@ export class ElectricityAvailabilityService {
 
     const yesterdayData = (
       await this.electricityRepository.getLatestAvailability({
+        placeId: place.id,
         from: yesterdayStart,
         till: todayStart,
       })
     ).map((item) => ({
       ...item,
-      time: convertToTimeZone(item.time, { timeZone }),
+      time: convertToTimeZone(item.time, { timeZone: place.timezone }),
     }));
     const yesterdayHistory = this.availabilityDataToHistory({
       start: yesterdayStart,
@@ -112,14 +90,67 @@ export class ElectricityAvailabilityService {
       sortedAvailabilityData: yesterdayData,
     });
 
-    // TODO: finish (stats)
-
     return {
       history: {
         today: todayHistory,
         yesterday: yesterdayHistory,
       },
     };
+  }
+
+  public async checkAndSavePlaceElectricityAvailability(params: {
+    readonly place: Place;
+  }): Promise<void> {
+    const { place } = params;
+
+    const isChecking = !!this.isCheckingPlaceAvailability[place.id];
+
+    if (isChecking) {
+      this.logger.log(`Availability check of ${place.name} is in progress when next check was launched, skipping next check`);
+
+      return;
+    }
+
+    this.isCheckingPlaceAvailability[place.id] = true;
+
+    let alive = false;
+    let currentTime = Date.now();
+    const tresholdMinutes = place.unavailabilityTresholdMinutes ?? DEFAULT_TRESHOLD_MINUTES;
+    const tresholdMilliseconds = tresholdMinutes * 60 * 1000;
+    const finishTime = currentTime + tresholdMilliseconds;
+
+    while (!alive && currentTime < finishTime) {
+      const res = await ping.promise.probe(place.host);
+
+      alive = res.alive;
+
+      if (!alive) {
+        await this.sleep({ ms: 1 * 1000 }); // 1s
+      }
+
+      currentTime = Date.now();
+    }
+
+    const [latest] = await this.electricityRepository.getLatestAvailability({
+      placeId: place.id,
+      limit: 1,
+    });
+
+    if (latest?.isAvailable === alive) {
+      this.isCheckingPlaceAvailability[place.id] = false;
+
+      return;
+    }
+
+    await this.electricityRepository.saveAvailability({ placeId: place.id, isAvailable: alive });
+
+    this._availabilityChange$.next({ placeId: place.id });
+
+    this.logger.verbose(
+      `Availability state of ${place.name} changed from ${latest?.isAvailable} to ${alive}, saving`
+    );
+
+    this.isCheckingPlaceAvailability[place.id] = false;
   }
 
   private availabilityDataToHistory(params: {

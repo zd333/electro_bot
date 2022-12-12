@@ -16,10 +16,12 @@
     "baseUrl": ".",
     "paths": {
       "@electrobot/bot": ["libs/bot/src/index.ts"],
+      "@electrobot/domain": ["libs/domain/src/index.ts"],
       "@electrobot/electricity-availability": [
         "libs/electricity-availability/src/index.ts"
       ],
       "@electrobot/electricity-repo": ["libs/electricity-repo/src/index.ts"],
+      "@electrobot/place-repo": ["libs/place-repo/src/index.ts"],
       "@electrobot/user-repo": ["libs/user-repo/src/index.ts"]
     }
   },
