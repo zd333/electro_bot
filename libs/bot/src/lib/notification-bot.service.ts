@@ -25,18 +25,19 @@ const MSG_DISABLED_REASON = `Причина вимкнення - йо#ана р�
 const MSG_DISABLED_SUFFIX =
   'Скеруй лють до русні підтримавши українську армію!\n' +
   'Ось один із зручних способів зробити донат: @Donate1024Bot.';
+const MSG_LAUNCH_DOC_LINK = '<a href="https://zd333.github.io/electro_bot/doc/launch-bot-for-my-place.html">Як ти можеш запустити такого бота для власної локації без всякого програмування</a>';
 
 const RESP_START = (params: { readonly place: string }) =>
   `Привіт! Цей бот допомогає моніторити ситуацію зі світлом (електроенергією) в ${params.place}.\n\n` +
+  `${MSG_LAUNCH_DOC_LINK}\n\n` +
   `За допомогою команди /current ти завжди можеш дізнатися чи є зараз в кварталі світло і як довго це триває.\n\n` +
   `Команда /subscribe дозволяє підписатися на сповіщення щодо зміни ситуації (відключення/включення).\n\n` +
   `За допомогою команди /stats можна переглянути статистику (звіт по включенням/` +
   `відключенням за поточну і попередню добу, сумарний час наявності/відсутності світла).\n\n` +
   `Контроль наявності світла відбувається за допомогою перевірки наявності Інтернет зв‘язку з провайдером ${params.place}, тому в разі проблем з Інтернетом бот може видавати невірну інформацію.\n\n` +
+  `${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\n\n` +
+  `https://www.instagram.com/oleksandr_changli/\n\n` +
   `${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
-const RESP_START_SECOND_TEST_MODE =
-  'Бот поки що працює в тестовому режимі, тому ми заздалегідь просимо пробачити можливі помилки і глюки.\n' +
-  'З часом вони всі будуть виправлені.';
 const RESP_NO_CURRENT_INFO = (params: { readonly place: string }) =>
   `Нажаль, наразі інформація щодо наявності світла в ${params.place} відсутня.`;
 const RESP_CURRENTLY_AVAILABLE = (params: {
@@ -63,11 +64,13 @@ const RESP_UNSUBSCRIBED = (params: { readonly place: string }) =>
   `Підписка скасована - ти більше не будеш отримувати повідомлення щодо зміни ситуації зі світлом в ${params.place}.`;
 const RESP_WAS_NOT_SUBSCRIBED = (params: { readonly place: string }) =>
   `Підписка і так відсутня, ти зараз не отримуєш повідомлення щодо зміни ситуації зі світлом в ${params.place}.`;
-const RESP_ABOUT = `Версія ${VERSION}\n\n`
-  +`Якщо вам подобається цей бот - можете подякувати донатом на підтримку української армії @Donate1024Bot.\n\n`
-  +`${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\n`
-  +`https://www.instagram.com/oleksandr_changli/\n\n`
-  +`https://github.com/zd333/electro_bot`;
+const RESP_ABOUT =
+  `Версія ${VERSION}\n\n` +
+  `${MSG_LAUNCH_DOC_LINK}\n\n` +
+  `Якщо вам подобається цей бот - можете подякувати донатом на підтримку української армії @Donate1024Bot.\n\n` +
+  `${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\n\n` +
+  `https://www.instagram.com/oleksandr_changli/\n\n` +
+  `https://github.com/zd333/electro_bot`;
 const RESP_ENABLED_SHORT = (params: {
   readonly when: string;
   readonly place: string;
@@ -142,8 +145,7 @@ export class NotificationBotService {
 
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
-    telegramBot.sendMessage(msg.chat.id, RESP_START({ place: place.name }));
-    telegramBot.sendMessage(msg.chat.id, RESP_START_SECOND_TEST_MODE);
+    telegramBot.sendMessage(msg.chat.id, RESP_START({ place: place.name }), { parse_mode: 'HTML'});
   }
 
   private async handleCurrentCommand(params: {
@@ -171,7 +173,8 @@ export class NotificationBotService {
     if (!latest) {
       telegramBot.sendMessage(
         msg.chat.id,
-        RESP_NO_CURRENT_INFO({ place: place.name })
+        RESP_NO_CURRENT_INFO({ place: place.name }),
+        { parse_mode: 'HTML'}
       );
 
       return;
@@ -190,7 +193,7 @@ export class NotificationBotService {
       ? RESP_CURRENTLY_AVAILABLE({ when, howLong, place: place.name })
       : RESP_CURRENTLY_UNAVAILABLE({ when, howLong, place: place.name });
 
-    telegramBot.sendMessage(msg.chat.id, response);
+    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML'});
   }
 
   private async handleSubscribeCommand(params: {
@@ -217,7 +220,7 @@ export class NotificationBotService {
       ? RESP_SUBSCRIPTION_CREATED({ place: place.name })
       : RESP_SUBSCRIPTION_ALREADY_EXISTS({ place: place.name });
 
-    telegramBot.sendMessage(msg.chat.id, response);
+    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML'});
   }
 
   private async handleUnsubscribeCommand(params: {
@@ -244,7 +247,7 @@ export class NotificationBotService {
       ? RESP_UNSUBSCRIBED({ place: place.name })
       : RESP_WAS_NOT_SUBSCRIBED({ place: place.name });
 
-    telegramBot.sendMessage(msg.chat.id, response);
+    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML'});
   }
 
   // TODO: refactor (make cleaner)
@@ -405,7 +408,7 @@ export class NotificationBotService {
 
     response += `\n\n${MSG_DISABLED_SUFFIX}`;
 
-    telegramBot.sendMessage(msg.chat.id, response);
+    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML'});
   }
 
   private async handleAboutCommand(params: {
@@ -422,7 +425,7 @@ export class NotificationBotService {
       return;
     }
 
-    telegramBot.sendMessage(msg.chat.id, RESP_ABOUT);
+    telegramBot.sendMessage(msg.chat.id, RESP_ABOUT, { parse_mode: 'HTML'});
   }
 
   private async notifyAllPlaceSubscribersAboutElectricityAvailabilityChange(params: {
@@ -498,7 +501,7 @@ export class NotificationBotService {
 
     subscribers.forEach(({ chatId }) => {
       try {
-        botEntry.telegramBot.sendMessage(chatId, response);
+        botEntry.telegramBot.sendMessage(chatId, response, { parse_mode: 'HTML'});
       } catch (e) {
         this.logger.error(
           `Failed to send notification to ${chatId} chat ID: ${JSON.stringify(
@@ -572,6 +575,11 @@ export class NotificationBotService {
   }): void {
     const { place, bot } = params;
     const telegramBot = new TelegramBot(bot.token, { polling: true });
+
+    this.placeBots[bot.placeId] = {
+      bot,
+      telegramBot,
+    };
 
     // Matches /start
     telegramBot.onText(/\/start/, (msg) =>

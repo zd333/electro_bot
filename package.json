@@ -6,7 +6,8 @@
     "start": "nx serve",
     "build": "nx build",
     "test": "nx test",
-    "migrate:electro-bot": "npx knex migrate:latest"
+    "migrate:electro-bot": "npx knex migrate:latest",
+    "gendoc": "npx marked -i doc/launch-bot-for-my-place.md -o doc/launch-bot-for-my-place.html --gfm"
   },
   "private": true,
   "dependencies": {

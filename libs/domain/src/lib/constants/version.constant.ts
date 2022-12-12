@@ -1,4 +1,4 @@
 /**
  * App (and all business logic) version.
  */
-export const VERSION = '0.2.1';
+export const VERSION = '0.2.3';

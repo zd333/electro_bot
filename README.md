@@ -59,3 +59,7 @@ Do this when no space left on builder device:
 
 - `flyctl apps list | grep builder`
 - `flyctl apps destroy <name>`
+
+## Generate HTML docs
+
+- `npm run gendoc`
