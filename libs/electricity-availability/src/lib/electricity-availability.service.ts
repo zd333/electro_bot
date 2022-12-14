@@ -103,6 +103,8 @@ export class ElectricityAvailabilityService {
   }): Promise<void> {
     const { place } = params;
 
+    this.logger.verbose(`Starting availability check of ${place.name}`);
+
     const isChecking = !!this.isCheckingPlaceAvailability[place.id];
 
     if (isChecking) {
@@ -113,42 +115,46 @@ export class ElectricityAvailabilityService {
 
     this.isCheckingPlaceAvailability[place.id] = true;
 
-    let alive = false;
-    let currentTime = Date.now();
-    const tresholdMinutes = place.unavailabilityTresholdMinutes ?? DEFAULT_TRESHOLD_MINUTES;
-    const tresholdMilliseconds = tresholdMinutes * 60 * 1000;
-    const finishTime = currentTime + tresholdMilliseconds;
+    try {
+      let alive = false;
+      let currentTime = Date.now();
+      const tresholdMinutes = place.unavailabilityTresholdMinutes ?? DEFAULT_TRESHOLD_MINUTES;
+      const tresholdMilliseconds = tresholdMinutes * 60 * 1000;
+      const finishTime = currentTime + tresholdMilliseconds;
 
-    while (!alive && currentTime < finishTime) {
-      const res = await ping.promise.probe(place.host);
+      while (!alive && currentTime < finishTime) {
+        const res = await ping.promise.probe(place.host);
 
-      alive = res.alive;
+        alive = res.alive;
 
-      if (!alive) {
-        await this.sleep({ ms: 1 * 1000 }); // 1s
+        if (!alive) {
+          await this.sleep({ ms: 1 * 1000 }); // 1s
+        }
+
+        currentTime = Date.now();
       }
 
-      currentTime = Date.now();
+      const [latest] = await this.electricityRepository.getLatestAvailability({
+        placeId: place.id,
+        limit: 1,
+      });
+
+      if (latest?.isAvailable === alive) {
+        this.isCheckingPlaceAvailability[place.id] = false;
+
+        return;
+      }
+
+      await this.electricityRepository.saveAvailability({ placeId: place.id, isAvailable: alive });
+
+      this._availabilityChange$.next({ placeId: place.id });
+
+      this.logger.verbose(
+        `Availability state of ${place.name} changed from ${latest?.isAvailable} to ${alive}, saving`
+      );
+    } catch(e) {
+      //
     }
-
-    const [latest] = await this.electricityRepository.getLatestAvailability({
-      placeId: place.id,
-      limit: 1,
-    });
-
-    if (latest?.isAvailable === alive) {
-      this.isCheckingPlaceAvailability[place.id] = false;
-
-      return;
-    }
-
-    await this.electricityRepository.saveAvailability({ placeId: place.id, isAvailable: alive });
-
-    this._availabilityChange$.next({ placeId: place.id });
-
-    this.logger.verbose(
-      `Availability state of ${place.name} changed from ${latest?.isAvailable} to ${alive}, saving`
-    );
 
     this.isCheckingPlaceAvailability[place.id] = false;
   }

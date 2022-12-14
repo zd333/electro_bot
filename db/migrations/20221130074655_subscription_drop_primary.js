@@ -2,8 +2,8 @@
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-exports.up = function(knex) {  return knex.schema
-  .alterTable('subscription', function (table) {
+exports.up = function (knex) {
+  return knex.schema.alterTable('subscription', function (table) {
     table.dropPrimary();
   });
 };
@@ -12,6 +12,6 @@ exports.up = function(knex) {  return knex.schema
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-exports.down = function(knex) {
+exports.down = function (knex) {
   //
 };
