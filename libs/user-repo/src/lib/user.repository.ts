@@ -5,6 +5,19 @@ import { InjectKnex, Knex } from 'nestjs-knex';
 export class UserRepository {
   constructor(@InjectKnex() private readonly knex: Knex) {}
 
+  public async saveUserAction(params: {
+    readonly placeId: string;
+    readonly chatId: number;
+    readonly command: string;
+  }): Promise<void> {
+    await this.knex.table('user_action').insert({
+      place_id: params.placeId,
+      chat_id: params.chatId,
+      command: params.command,
+      created_at: new Date(),
+    });
+  }
+
   public async addUserSubscription(params: {
     readonly placeId: string;
     readonly chatId: number;

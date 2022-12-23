@@ -27,9 +27,10 @@ const MSG_DISABLED_SUFFIX =
   'Ось один із зручних способів зробити донат: @Donate1024Bot.';
 const MSG_LAUNCH_DOC_LINK = '<a href="https://zd333.github.io/electro_bot/doc/launch-bot-for-my-place.html">Як ти можеш запустити такого бота для власної локації без всякого програмування</a>';
 
-const RESP_START = (params: { readonly place: string }) =>
+const RESP_START = (params: { readonly place: string, readonly listedBotsMessage: string }) =>
   `Привіт! Цей бот допомогає моніторити ситуацію зі світлом (електроенергією) в ${params.place}.\n\n` +
   `${MSG_LAUNCH_DOC_LINK}\n\n` +
+  params.listedBotsMessage +
   `За допомогою команди /current ти завжди можеш дізнатися чи є зараз в кварталі світло і як довго це триває.\n\n` +
   `Команда /subscribe дозволяє підписатися на сповіщення щодо зміни ситуації (відключення/включення).\n\n` +
   `За допомогою команди /stats можна переглянути статистику (звіт по включенням/` +
@@ -64,13 +65,13 @@ const RESP_UNSUBSCRIBED = (params: { readonly place: string }) =>
   `Підписка скасована - ти більше не будеш отримувати повідомлення щодо зміни ситуації зі світлом в ${params.place}.`;
 const RESP_WAS_NOT_SUBSCRIBED = (params: { readonly place: string }) =>
   `Підписка і так відсутня, ти зараз не отримуєш повідомлення щодо зміни ситуації зі світлом в ${params.place}.`;
-const RESP_ABOUT =
+const RESP_ABOUT = (params: { readonly listedBotsMessage: string }) =>
   `Версія ${VERSION}\n\n` +
   `${MSG_LAUNCH_DOC_LINK}\n\n` +
-  `Якщо вам подобається цей бот - можете подякувати донатом на підтримку української армії @Donate1024Bot.\n\n` +
+  params.listedBotsMessage +
+  `Якщо тобі подобається цей бот - можеш подякувати донатом на підтримку української армії @Donate1024Bot.\n\n` +
   `${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\n\n` +
-  `https://www.instagram.com/oleksandr_changli/\n\n` +
-  `https://github.com/zd333/electro_bot`;
+  `https://www.instagram.com/oleksandr_changli/`;
 const RESP_ENABLED_SHORT = (params: {
   readonly when: string;
   readonly place: string;
@@ -143,9 +144,17 @@ export class NotificationBotService {
       return;
     }
 
+    await this.userRepository.saveUserAction({
+      placeId: place.id,
+      chatId: msg.chat.id,
+      command: 'start',
+    });
+
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
-    telegramBot.sendMessage(msg.chat.id, RESP_START({ place: place.name }), { parse_mode: 'HTML'});
+    const listedBotsMessage = await this.composeListedBotsMessage();
+
+    telegramBot.sendMessage(msg.chat.id, RESP_START({ place: place.name, listedBotsMessage }), { parse_mode: 'HTML'});
   }
 
   private async handleCurrentCommand(params: {
@@ -161,6 +170,12 @@ export class NotificationBotService {
 
       return;
     }
+
+    await this.userRepository.saveUserAction({
+      placeId: place.id,
+      chatId: msg.chat.id,
+      command: 'current',
+    });
 
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
@@ -210,6 +225,12 @@ export class NotificationBotService {
       return;
     }
 
+    await this.userRepository.saveUserAction({
+      placeId: place.id,
+      chatId: msg.chat.id,
+      command: 'subscribe',
+    });
+
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
     const added = await this.userRepository.addUserSubscription({
@@ -236,6 +257,12 @@ export class NotificationBotService {
 
       return;
     }
+
+    await this.userRepository.saveUserAction({
+      placeId: place.id,
+      chatId: msg.chat.id,
+      command: 'unsubscribe',
+    });
 
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
@@ -265,6 +292,12 @@ export class NotificationBotService {
       return;
     }
 
+    await this.userRepository.saveUserAction({
+      placeId: place.id,
+      chatId: msg.chat.id,
+      command: 'stats',
+    });
+
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
     const stats = await this.electricityAvailabilityService.getPlaceStats({
@@ -273,133 +306,144 @@ export class NotificationBotService {
 
     let response = '';
 
-    if (
+    if ((
       !!stats.history.yesterday?.length &&
       stats.history.yesterday?.length > 1
-    ) {
-      if (response.length > 0) {
-        response += '\n\n';
-      }
-
+    ) || stats.lastStateBeforeYesterday !== undefined) {
       response += `${EMOJ_KISS} Вчора:`;
 
-      const yesterday = stats.history.yesterday;
+      if (
+        !!stats.history.yesterday?.length &&
+        stats.history.yesterday?.length > 1
+      ) {
+        const yesterday = stats.history.yesterday;
 
-      const baseDate = new Date();
-      let baseDatePlusAvailable = new Date();
-      let baseDatePluesUnavailable = new Date();
+        const baseDate = new Date();
+        let baseDatePlusAvailable = new Date();
+        let baseDatePluesUnavailable = new Date();
 
-      yesterday.forEach(({ start, end, isEnabled }) => {
-        const durationInMinutes = differenceInMinutes(start, end);
+        yesterday.forEach(({ start, end, isEnabled }, i) => {
+          const s = i === 0 ? convertToTimeZone(start, { timeZone: place.timezone }) : start;
+          const e = i === (yesterday.length - 1) ? convertToTimeZone(end, { timeZone: place.timezone }) : end;
+          const durationInMinutes = differenceInMinutes(s, e);
 
-        if (isEnabled) {
-          baseDatePlusAvailable = addMinutes(
-            baseDatePlusAvailable,
-            durationInMinutes
-          );
-        } else {
-          baseDatePluesUnavailable = addMinutes(
-            baseDatePluesUnavailable,
-            durationInMinutes
-          );
-        }
-      });
+          if (isEnabled) {
+            baseDatePlusAvailable = addMinutes(
+              baseDatePlusAvailable,
+              durationInMinutes
+            );
+          } else {
+            baseDatePluesUnavailable = addMinutes(
+              baseDatePluesUnavailable,
+              durationInMinutes
+            );
+          }
+        });
 
-      const howLongAvailable = formatDistance(baseDatePlusAvailable, baseDate, {
-        locale: uk,
-        includeSeconds: false,
-      });
-      const howLongUnavailable = formatDistance(
-        baseDatePluesUnavailable,
-        baseDate,
-        {
-          locale: uk,
-          includeSeconds: false,
-        }
-      );
-
-      response = `${response}\nЗі світлом: ${howLongAvailable}\nБез світла: ${howLongUnavailable}`;
-
-      yesterday.forEach(({ start, end, isEnabled }, i) => {
-        const emoji = isEnabled ? EMOJ_BULB : EMOJ_MOON;
-        const s = format(start, 'HH:mm', { locale: uk });
-        const e = format(end, 'HH:mm', { locale: uk });
-        const duration = formatDistance(end, start, {
+        const howLongAvailable = formatDistance(baseDatePlusAvailable, baseDate, {
           locale: uk,
           includeSeconds: false,
         });
-        const entry =
-          i === 0
-            ? `${emoji} до ${e}`
-            : i === yesterday.length - 1
-            ? `${emoji} з ${s}`
-            : `${emoji} ${s}-${e} (${duration})`;
+        const howLongUnavailable = formatDistance(
+          baseDatePluesUnavailable,
+          baseDate,
+          {
+            locale: uk,
+            includeSeconds: false,
+          }
+        );
 
-        response = `${response}\n${entry}`;
-      });
+        response = `${response}\nЗі світлом: ${howLongAvailable}\nБез світла: ${howLongUnavailable}`;
+
+        yesterday.forEach(({ start, end, isEnabled }, i) => {
+          const emoji = isEnabled ? EMOJ_BULB : EMOJ_MOON;
+          const s = format(start, 'HH:mm', { locale: uk });
+          const e = format(end, 'HH:mm', { locale: uk });
+          const duration = formatDistance(end, start, {
+            locale: uk,
+            includeSeconds: false,
+          });
+          const entry =
+            i === 0
+              ? `${emoji} до ${e}`
+              : i === yesterday.length - 1
+              ? `${emoji} з ${s}`
+              : `${emoji} ${s}-${e} (${duration})`;
+
+          response = `${response}\n${entry}`;
+        });
+      } else {
+        response += stats.lastStateBeforeYesterday ? ' постійно зі світлом' : ' взагалі без світла';
+      }
     }
 
-    if (!!stats.history.today?.length && stats.history.today?.length > 1) {
+    if ((!!stats.history.today?.length && stats.history.today?.length > 1) || stats.lastStateBeforeToday !== undefined) {
       if (response.length > 0) {
         response += '\n\n';
       }
 
       response += `${EMOJ_KISS_HEART} Сьогодні:`;
 
-      const today = stats.history.today;
+      if (!!stats.history.today?.length && stats.history.today?.length > 1) {
+        const today = stats.history.today;
 
-      const baseDate = new Date();
-      let baseDatePlusAvailable = new Date();
-      let baseDatePluesUnavailable = new Date();
+        const baseDate = new Date();
+        let baseDatePlusAvailable = new Date();
+        let baseDatePluesUnavailable = new Date();
 
-      today.forEach(({ start, end, isEnabled }) => {
-        const durationInMinutes = differenceInMinutes(start, end);
+        today.forEach(({ start, end, isEnabled }, i) => {
+          const s = i === 0 ? convertToTimeZone(start, { timeZone: place.timezone }) : start;
+          const e = i === (today.length - 1) ? convertToTimeZone(end, { timeZone: place.timezone }) : end;
+          const durationInMinutes = differenceInMinutes(s, e);
 
-        if (isEnabled) {
-          baseDatePlusAvailable = addMinutes(
-            baseDatePlusAvailable,
-            durationInMinutes
-          );
-        } else {
-          baseDatePluesUnavailable = addMinutes(
-            baseDatePluesUnavailable,
-            durationInMinutes
-          );
-        }
-      });
+          if (isEnabled) {
+            baseDatePlusAvailable = addMinutes(
+              baseDatePlusAvailable,
+              durationInMinutes
+            );
+          } else {
+            baseDatePluesUnavailable = addMinutes(
+              baseDatePluesUnavailable,
+              durationInMinutes
+            );
+          }
+        });
 
-      const howLongAvailable = formatDistance(baseDatePlusAvailable, baseDate, {
-        locale: uk,
-        includeSeconds: false,
-      });
-      const howLongUnavailable = formatDistance(
-        baseDatePluesUnavailable,
-        baseDate,
-        {
-          locale: uk,
-          includeSeconds: false,
-        }
-      );
-
-      response = `${response}\nЗі світлом: ${howLongAvailable}\nБез світла: ${howLongUnavailable}`;
-
-      today.forEach(({ start, end, isEnabled }, i) => {
-        const emoji = isEnabled ? EMOJ_BULB : EMOJ_MOON;
-        const s = format(start, 'HH:mm', { locale: uk });
-        const e = format(end, 'HH:mm', { locale: uk });
-        const duration = formatDistance(end, start, {
+        const howLongAvailable = formatDistance(baseDatePlusAvailable, baseDate, {
           locale: uk,
           includeSeconds: false,
         });
-        const entry =
-          i === 0
-            ? `${emoji} до ${e}`
-            : i === today.length - 1
-            ? `${emoji} з ${s}`
-            : `${emoji} ${s}-${e} (${duration})`;
+        const howLongUnavailable = formatDistance(
+          baseDatePluesUnavailable,
+          baseDate,
+          {
+            locale: uk,
+            includeSeconds: false,
+          }
+        );
 
-        response = `${response}\n${entry}`;
-      });
+        response = `${response}\nЗі світлом: ${howLongAvailable}\nБез світла: ${howLongUnavailable}`;
+
+        today.forEach(({ start, end, isEnabled }, i) => {
+          const emoji = isEnabled ? EMOJ_BULB : EMOJ_MOON;
+          const s = format(start, 'HH:mm', { locale: uk });
+          const e = format(end, 'HH:mm', { locale: uk });
+          const duration = formatDistance(end, start, {
+            locale: uk,
+            includeSeconds: false,
+          });
+          const entry =
+            i === 0
+              ? `${emoji} до ${e}`
+              : i === today.length - 1
+              ? `${emoji} з ${s}`
+              : `${emoji} ${s}-${e} (${duration})`;
+
+          response = `${response}\n${entry}`;
+        });
+      } else {
+        response += stats.lastStateBeforeToday ? ' постійно зі світлом' : ' взагалі без світла';
+      }
     }
 
     if (response === '') {
@@ -425,7 +469,15 @@ export class NotificationBotService {
       return;
     }
 
-    telegramBot.sendMessage(msg.chat.id, RESP_ABOUT, { parse_mode: 'HTML'});
+    await this.userRepository.saveUserAction({
+      placeId: place.id,
+      chatId: msg.chat.id,
+      command: 'about',
+    });
+
+    const listedBotsMessage = await this.composeListedBotsMessage();
+
+    telegramBot.sendMessage(msg.chat.id, RESP_ABOUT({ listedBotsMessage }), { parse_mode: 'HTML'});
   }
 
   private async notifyAllPlaceSubscribersAboutElectricityAvailabilityChange(params: {
@@ -448,6 +500,14 @@ export class NotificationBotService {
     if (!botEntry) {
       this.logger.log(
         `No bot for ${place.name} - no subscriber notification performed`
+      );
+
+      return;
+    }
+
+    if (!botEntry.bot.isEnabled) {
+      this.logger.log(
+        `Bot for ${place.name} is disabled - skipping subscriber notification`
       );
 
       return;
@@ -615,5 +675,21 @@ export class NotificationBotService {
     telegramBot.onText(/\/about/, (msg) =>
       this.handleAboutCommand({ msg, place, bot, telegramBot })
     );
+  }
+
+  private async composeListedBotsMessage(): Promise<string> {
+    const stats = await this.placeRepository.getListedPlaceBotStats();
+
+    if (stats.length === 0) {
+      return '';
+    }
+
+    let res = 'Існуючі боти:\n';
+
+    stats.forEach(({ placeName, botName, numberOfUsers }) => {
+      res += `${placeName} - ${numberOfUsers} користувачів @${botName}\n`;
+    });
+
+    return res + '\n';
   }
 }

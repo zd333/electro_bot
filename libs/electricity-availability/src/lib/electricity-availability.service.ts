@@ -2,10 +2,7 @@ import { ElectricityRepository } from '@electrobot/electricity-repo';
 import { Injectable, Logger } from '@nestjs/common';
 import * as ping from 'ping';
 import { Subject } from 'rxjs';
-import {
-  startOfToday,
-  startOfYesterday,
-} from 'date-fns';
+import { startOfToday, startOfYesterday } from 'date-fns';
 import { convertToLocalTime, convertToTimeZone } from 'date-fns-timezone';
 import { HistoryItem } from './history-item.type';
 import { Place } from '@electrobot/domain';
@@ -16,7 +13,9 @@ const DEFAULT_TRESHOLD_MINUTES = 7;
 @Injectable()
 export class ElectricityAvailabilityService {
   private readonly logger = new Logger(ElectricityAvailabilityService.name);
-  private readonly _availabilityChange$ = new Subject<{ readonly placeId: string }>();
+  private readonly _availabilityChange$ = new Subject<{
+    readonly placeId: string;
+  }>();
   private isCheckingPlaceAvailability: Record<string, boolean> = {};
 
   public readonly availabilityChange$ =
@@ -24,12 +23,14 @@ export class ElectricityAvailabilityService {
 
   constructor(
     private readonly electricityRepository: ElectricityRepository,
-    private readonly placeRepository: PlaceRepository,
+    private readonly placeRepository: PlaceRepository
   ) {}
 
   public async checkAndSaveElectricityAvailabilityStateOfAllPlaces(): Promise<void> {
     const places = await this.placeRepository.getAllPlaces();
-    const jobs = places.map((place) => this.checkAndSavePlaceElectricityAvailability({ place }));
+    const jobs = places.map((place) =>
+      this.checkAndSavePlaceElectricityAvailability({ place })
+    );
 
     await Promise.all(jobs);
   }
@@ -52,11 +53,17 @@ export class ElectricityAvailabilityService {
       readonly today?: Array<HistoryItem>;
       readonly yesterday?: Array<HistoryItem>;
     };
+    readonly lastStateBeforeToday?: boolean;
+    readonly lastStateBeforeYesterday?: boolean;
   }> {
     const { place } = params;
     const now = new Date();
-    const todayStart = convertToLocalTime(startOfToday(), { timeZone: place.timezone });
-    const yesterdayStart = convertToLocalTime(startOfYesterday(), { timeZone: place.timezone });
+    const todayStart = convertToLocalTime(startOfToday(), {
+      timeZone: place.timezone,
+    });
+    const yesterdayStart = convertToLocalTime(startOfYesterday(), {
+      timeZone: place.timezone,
+    });
 
     const todayData = (
       await this.electricityRepository.getLatestAvailability({
@@ -73,6 +80,14 @@ export class ElectricityAvailabilityService {
       end: now,
       sortedAvailabilityData: todayData,
     });
+    const beforeTodayRes =
+      await this.electricityRepository.getLatestAvailability({
+        placeId: place.id,
+        till: todayStart,
+        limit: 1,
+      });
+    const lastStateBeforeToday =
+      beforeTodayRes.length > 0 ? beforeTodayRes[0].isAvailable : undefined;
 
     const yesterdayData = (
       await this.electricityRepository.getLatestAvailability({
@@ -89,12 +104,24 @@ export class ElectricityAvailabilityService {
       end: todayStart,
       sortedAvailabilityData: yesterdayData,
     });
+    const beforeYesterdayRes =
+      await this.electricityRepository.getLatestAvailability({
+        placeId: place.id,
+        till: yesterdayStart,
+        limit: 1,
+      });
+    const lastStateBeforeYesterday =
+      beforeYesterdayRes.length > 0
+        ? beforeYesterdayRes[0].isAvailable
+        : undefined;
 
     return {
       history: {
         today: todayHistory,
         yesterday: yesterdayHistory,
       },
+      lastStateBeforeToday,
+      lastStateBeforeYesterday,
     };
   }
 
@@ -108,7 +135,9 @@ export class ElectricityAvailabilityService {
     const isChecking = !!this.isCheckingPlaceAvailability[place.id];
 
     if (isChecking) {
-      this.logger.log(`Availability check of ${place.name} is in progress when next check was launched, skipping next check`);
+      this.logger.log(
+        `Availability check of ${place.name} is in progress when next check was launched, skipping next check`
+      );
 
       return;
     }
@@ -118,7 +147,8 @@ export class ElectricityAvailabilityService {
     try {
       let alive = false;
       let currentTime = Date.now();
-      const tresholdMinutes = place.unavailabilityTresholdMinutes ?? DEFAULT_TRESHOLD_MINUTES;
+      const tresholdMinutes =
+        place.unavailabilityTresholdMinutes ?? DEFAULT_TRESHOLD_MINUTES;
       const tresholdMilliseconds = tresholdMinutes * 60 * 1000;
       const finishTime = currentTime + tresholdMilliseconds;
 
@@ -145,14 +175,17 @@ export class ElectricityAvailabilityService {
         return;
       }
 
-      await this.electricityRepository.saveAvailability({ placeId: place.id, isAvailable: alive });
+      await this.electricityRepository.saveAvailability({
+        placeId: place.id,
+        isAvailable: alive,
+      });
 
       this._availabilityChange$.next({ placeId: place.id });
 
       this.logger.verbose(
         `Availability state of ${place.name} changed from ${latest?.isAvailable} to ${alive}, saving`
       );
-    } catch(e) {
+    } catch (e) {
       //
     }
 
@@ -199,6 +232,6 @@ export class ElectricityAvailabilityService {
   }
 
   private async sleep(params: { readonly ms: number }): Promise<void> {
-    new Promise(r => setTimeout(r, params.ms));
+    new Promise((r) => setTimeout(r, params.ms));
   }
 }
