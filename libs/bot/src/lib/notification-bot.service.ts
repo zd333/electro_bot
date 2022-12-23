@@ -6,6 +6,7 @@ import {
   differenceInMinutes,
   format,
   formatDistance,
+
 } from 'date-fns';
 import { convertToTimeZone } from 'date-fns-timezone';
 import { uk } from 'date-fns/locale';
@@ -14,17 +15,24 @@ import * as Emoji from 'node-emoji';
 import { Bot, Place, VERSION } from '@electrobot/domain';
 import { PlaceRepository } from '@electrobot/place-repo';
 
+const MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES = 45;
+
 const EMOJ_UA = Emoji.get(Emoji.emoji['flag-ua']);
 const EMOJ_POOP = Emoji.get(Emoji.emoji['poop']);
 const EMOJ_BULB = Emoji.get(Emoji.emoji['bulb']);
 const EMOJ_MOON = Emoji.get(Emoji.emoji['new_moon_with_face']);
+const EMOJ_HALF_MOON = Emoji.get(Emoji.emoji['waning_crescent_moon']);
 const EMOJ_KISS = Emoji.get(Emoji.emoji['kiss']);
 const EMOJ_KISS_HEART = Emoji.get(Emoji.emoji['kissing_heart']);
 
 const MSG_DISABLED_REASON = `Причина вимкнення - йо#ана русня!${EMOJ_POOP}`;
-const MSG_DISABLED_SUFFIX =
+const MSG_DISABLED_REGULAR_SUFFIX =
   'Скеруй лють до русні підтримавши українську армію!\n' +
   'Ось один із зручних способів зробити донат: @Donate1024Bot.';
+const MSG_DISABLED_SUSPICIOUS_TIME_SUFFIX =
+  'Увага! Контроль наявності світла відбувається за допомогою перевірки Інтернет зв‘язку!\n' +
+  'У разі проблем з Інтернетом бот може видавати невірну інформацію (повідомляти про відключення світла, коли світло насправді є)!';
+
 const MSG_LAUNCH_DOC_LINK = '<a href="https://zd333.github.io/electro_bot/doc/launch-bot-for-my-place.html">Як ти можеш запустити такого бота для власної локації без всякого програмування</a>';
 
 const RESP_START = (params: { readonly place: string, readonly listedBotsMessage: string }) =>
@@ -35,7 +43,7 @@ const RESP_START = (params: { readonly place: string, readonly listedBotsMessage
   `Команда /subscribe дозволяє підписатися на сповіщення щодо зміни ситуації (відключення/включення).\n\n` +
   `За допомогою команди /stats можна переглянути статистику (звіт по включенням/` +
   `відключенням за поточну і попередню добу, сумарний час наявності/відсутності світла).\n\n` +
-  `Контроль наявності світла відбувається за допомогою перевірки наявності Інтернет зв‘язку з провайдером ${params.place}, тому в разі проблем з Інтернетом бот може видавати невірну інформацію.\n\n` +
+  `Контроль наявності світла відбувається за допомогою перевірки Інтернет зв‘язку з провайдером ${params.place}, тому в разі проблем з Інтернетом бот може видавати невірну інформацію.\n\n` +
   `${EMOJ_KISS_HEART} Обіймаю, назавжди ваш @oleksandr_changli\n\n` +
   `https://www.instagram.com/oleksandr_changli/\n\n` +
   `${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
@@ -54,7 +62,7 @@ const RESP_CURRENTLY_UNAVAILABLE = (params: {
   readonly place: string;
 }) =>
   `${EMOJ_MOON} Нажаль, наразі світла в ${params.place} нема.\nВимкнення відбулося ${params.when}.\n` +
-  `Світло відсутнє вже ${params.howLong}.\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_SUFFIX}`;
+  `Світло відсутнє вже ${params.howLong}.\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 const RESP_SUBSCRIPTION_CREATED = (params: { readonly place: string }) =>
   `Підписка створена - ти будеш отримувати повідомлення кожного разу після зміни ситуації зі світлом в ${params.place}.\n` +
   `Ти завжди можеш відписатися за допомогою команди /unsubscribe.`;
@@ -81,7 +89,7 @@ const RESP_DISABLED_SHORT = (params: {
   readonly when: string;
   readonly place: string;
 }) =>
-  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params} вимкнено!\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_SUFFIX}`;
+  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params} вимкнено!\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 const RESP_ENABLED_DETAILED = (params: {
   readonly when: string;
   readonly howLong: string;
@@ -95,7 +103,13 @@ const RESP_DISABLED_DETAILED = (params: {
   readonly place: string;
 }) =>
   `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params.place} вимкнено!\n` +
-  `Ми насолоджувалися світлом ${params.howLong}.\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_SUFFIX}`;
+  `Ми насолоджувалися світлом ${params.howLong}.\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
+  const RESP_DISABLED_SUSPICIOUS = (params: {
+    readonly when: string;
+    readonly place: string;
+  }) =>
+    `${EMOJ_HALF_MOON} ${params.when}\nКарамба, можливо світло в ${params.place} вимкнено!\n\n` +
+    MSG_DISABLED_SUSPICIOUS_TIME_SUFFIX;
 
 @Injectable()
 export class NotificationBotService {
@@ -450,7 +464,7 @@ export class NotificationBotService {
       response = 'Наразі інформація відсутня.';
     }
 
-    response += `\n\n${MSG_DISABLED_SUFFIX}`;
+    response += `\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 
     telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML'});
   }
@@ -553,9 +567,12 @@ export class NotificationBotService {
         locale: uk,
         includeSeconds: false,
       });
+      const diffInMinutes = Math.abs(differenceInMinutes(previousTime, latestTime));
 
       response = latest.isAvailable
         ? RESP_ENABLED_DETAILED({ when, howLong, place: place.name })
+        : diffInMinutes <= MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES
+        ? RESP_DISABLED_SUSPICIOUS({ when, place: place.name })
         : RESP_DISABLED_DETAILED({ when, howLong, place: place.name });
     }
 
