@@ -38,9 +38,9 @@ export class PlaceRepository {
   public async getListedPlaceBotStats(): Promise<Array<BotStats>> {
     return await this.knex
       .select<Array<BotStats>>(
-        'count(DISTINCT user_action.chat_id) as numberOfUsers',
-        'MIN(place.name) as placeName',
-        'MIN(bot.bot_name) as botName',
+        this.knex.raw('count(DISTINCT "user_action"."chat_id") as "numberOfUsers"'),
+        this.knex.raw('MIN("place"."name") as "placeName"'),
+        this.knex.raw('MIN("bot"."bot_name") as "botName"'),
       )
       .from('user_action')
       .innerJoin('place', 'place.id', '=', 'user_action.place_id')
@@ -50,6 +50,6 @@ export class PlaceRepository {
         'bot.is_publically_listed': true,
       })
       .groupBy('user_action.place_id')
-      .orderBy('numberOfUsers', 'desc');
+      .orderBy('numberOfUsers', 'DESC');
   }
 }
