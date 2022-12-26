@@ -6,14 +6,33 @@ import {
   differenceInMinutes,
   format,
   formatDistance,
-
 } from 'date-fns';
 import { convertToTimeZone } from 'date-fns-timezone';
 import { uk } from 'date-fns/locale';
 import * as TelegramBot from 'node-telegram-bot-api';
 import { Bot, Place } from '@electrobot/domain';
 import { PlaceRepository } from '@electrobot/place-repo';
-import { EMOJ_BULB, EMOJ_KISS, EMOJ_KISS_HEART, EMOJ_MOON, MSG_DISABLED_REGULAR_SUFFIX, RESP_ABOUT, RESP_CURRENTLY_AVAILABLE, RESP_CURRENTLY_UNAVAILABLE, RESP_DISABLED_DETAILED, RESP_DISABLED_SHORT, RESP_DISABLED_SUSPICIOUS, RESP_ENABLED_DETAILED, RESP_ENABLED_SHORT, RESP_NO_CURRENT_INFO, RESP_START, RESP_SUBSCRIPTION_ALREADY_EXISTS, RESP_SUBSCRIPTION_CREATED, RESP_UNSUBSCRIBED, RESP_WAS_NOT_SUBSCRIBED } from './messages.constant';
+import {
+  EMOJ_BULB,
+  EMOJ_KISS,
+  EMOJ_KISS_HEART,
+  EMOJ_MOON,
+  MSG_DISABLED_REGULAR_SUFFIX,
+  RESP_ABOUT,
+  RESP_CURRENTLY_AVAILABLE,
+  RESP_CURRENTLY_UNAVAILABLE,
+  RESP_DISABLED_DETAILED,
+  RESP_DISABLED_SHORT,
+  RESP_DISABLED_SUSPICIOUS,
+  RESP_ENABLED_DETAILED,
+  RESP_ENABLED_SHORT,
+  RESP_NO_CURRENT_INFO,
+  RESP_START,
+  RESP_SUBSCRIPTION_ALREADY_EXISTS,
+  RESP_SUBSCRIPTION_CREATED,
+  RESP_UNSUBSCRIBED,
+  RESP_WAS_NOT_SUBSCRIBED,
+} from './messages.constant';
 
 const MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES = 45;
 
@@ -74,7 +93,11 @@ export class NotificationBotService {
 
     const listedBotsMessage = await this.composeListedBotsMessage();
 
-    telegramBot.sendMessage(msg.chat.id, RESP_START({ place: place.name, listedBotsMessage }), { parse_mode: 'HTML'});
+    telegramBot.sendMessage(
+      msg.chat.id,
+      RESP_START({ place: place.name, listedBotsMessage }),
+      { parse_mode: 'HTML' }
+    );
   }
 
   private async handleCurrentCommand(params: {
@@ -109,7 +132,7 @@ export class NotificationBotService {
       telegramBot.sendMessage(
         msg.chat.id,
         RESP_NO_CURRENT_INFO({ place: place.name }),
-        { parse_mode: 'HTML'}
+        { parse_mode: 'HTML' }
       );
 
       return;
@@ -128,7 +151,7 @@ export class NotificationBotService {
       ? RESP_CURRENTLY_AVAILABLE({ when, howLong, place: place.name })
       : RESP_CURRENTLY_UNAVAILABLE({ when, howLong, place: place.name });
 
-    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML'});
+    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
   }
 
   private async handleSubscribeCommand(params: {
@@ -161,7 +184,7 @@ export class NotificationBotService {
       ? RESP_SUBSCRIPTION_CREATED({ place: place.name })
       : RESP_SUBSCRIPTION_ALREADY_EXISTS({ place: place.name });
 
-    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML'});
+    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
   }
 
   private async handleUnsubscribeCommand(params: {
@@ -194,7 +217,7 @@ export class NotificationBotService {
       ? RESP_UNSUBSCRIBED({ place: place.name })
       : RESP_WAS_NOT_SUBSCRIBED({ place: place.name });
 
-    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML'});
+    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
   }
 
   // TODO: refactor (make cleaner)
@@ -220,16 +243,18 @@ export class NotificationBotService {
 
     this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
 
-    const stats = await this.electricityAvailabilityService.getTodayeAndYesterdayStats({
-      place,
-    });
+    const stats =
+      await this.electricityAvailabilityService.getTodayAndYesterdayStats({
+        place,
+      });
 
     let response = '';
 
-    if ((
-      !!stats.history.yesterday?.length &&
-      stats.history.yesterday?.length > 1
-    ) || stats.lastStateBeforeYesterday !== undefined) {
+    if (
+      (!!stats.history.yesterday?.length &&
+        stats.history.yesterday?.length > 1) ||
+      stats.lastStateBeforeYesterday !== undefined
+    ) {
       response += `${EMOJ_KISS} Вчора:`;
 
       if (
@@ -243,8 +268,14 @@ export class NotificationBotService {
         let baseDatePluesUnavailable = new Date();
 
         yesterday.forEach(({ start, end, isEnabled }, i) => {
-          const s = i === 0 ? convertToTimeZone(start, { timeZone: place.timezone }) : start;
-          const e = i === (yesterday.length - 1) ? convertToTimeZone(end, { timeZone: place.timezone }) : end;
+          const s =
+            i === 0
+              ? convertToTimeZone(start, { timeZone: place.timezone })
+              : start;
+          const e =
+            i === yesterday.length - 1
+              ? convertToTimeZone(end, { timeZone: place.timezone })
+              : end;
           const durationInMinutes = differenceInMinutes(s, e);
 
           if (isEnabled) {
@@ -260,10 +291,14 @@ export class NotificationBotService {
           }
         });
 
-        const howLongAvailable = formatDistance(baseDatePlusAvailable, baseDate, {
-          locale: uk,
-          includeSeconds: false,
-        });
+        const howLongAvailable = formatDistance(
+          baseDatePlusAvailable,
+          baseDate,
+          {
+            locale: uk,
+            includeSeconds: false,
+          }
+        );
         const howLongUnavailable = formatDistance(
           baseDatePluesUnavailable,
           baseDate,
@@ -293,11 +328,16 @@ export class NotificationBotService {
           response = `${response}\n${entry}`;
         });
       } else {
-        response += stats.lastStateBeforeYesterday ? ' постійно зі світлом' : ' взагалі без світла';
+        response += stats.lastStateBeforeYesterday
+          ? ' постійно зі світлом'
+          : ' взагалі без світла';
       }
     }
 
-    if ((!!stats.history.today?.length && stats.history.today?.length > 1) || stats.lastStateBeforeToday !== undefined) {
+    if (
+      (!!stats.history.today?.length && stats.history.today?.length > 1) ||
+      stats.lastStateBeforeToday !== undefined
+    ) {
       if (response.length > 0) {
         response += '\n\n';
       }
@@ -312,8 +352,14 @@ export class NotificationBotService {
         let baseDatePluesUnavailable = new Date();
 
         today.forEach(({ start, end, isEnabled }, i) => {
-          const s = i === 0 ? convertToTimeZone(start, { timeZone: place.timezone }) : start;
-          const e = i === (today.length - 1) ? convertToTimeZone(end, { timeZone: place.timezone }) : end;
+          const s =
+            i === 0
+              ? convertToTimeZone(start, { timeZone: place.timezone })
+              : start;
+          const e =
+            i === today.length - 1
+              ? convertToTimeZone(end, { timeZone: place.timezone })
+              : end;
           const durationInMinutes = differenceInMinutes(s, e);
 
           if (isEnabled) {
@@ -329,10 +375,14 @@ export class NotificationBotService {
           }
         });
 
-        const howLongAvailable = formatDistance(baseDatePlusAvailable, baseDate, {
-          locale: uk,
-          includeSeconds: false,
-        });
+        const howLongAvailable = formatDistance(
+          baseDatePlusAvailable,
+          baseDate,
+          {
+            locale: uk,
+            includeSeconds: false,
+          }
+        );
         const howLongUnavailable = formatDistance(
           baseDatePluesUnavailable,
           baseDate,
@@ -362,7 +412,9 @@ export class NotificationBotService {
           response = `${response}\n${entry}`;
         });
       } else {
-        response += stats.lastStateBeforeToday ? ' постійно зі світлом' : ' взагалі без світла';
+        response += stats.lastStateBeforeToday
+          ? ' постійно зі світлом'
+          : ' взагалі без світла';
       }
     }
 
@@ -372,7 +424,7 @@ export class NotificationBotService {
 
     response += `\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 
-    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML'});
+    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
   }
 
   private async handleAboutCommand(params: {
@@ -397,14 +449,15 @@ export class NotificationBotService {
 
     const listedBotsMessage = await this.composeListedBotsMessage();
 
-    telegramBot.sendMessage(msg.chat.id, RESP_ABOUT({ listedBotsMessage }), { parse_mode: 'HTML'});
+    telegramBot.sendMessage(msg.chat.id, RESP_ABOUT({ listedBotsMessage }), {
+      parse_mode: 'HTML',
+    });
   }
 
   private async notifyAllPlaceSubscribersAboutElectricityAvailabilityChange(params: {
     readonly placeId: string;
   }): Promise<void> {
     const { placeId } = params;
-
     const place = this.places[placeId];
 
     if (!place) {
@@ -415,32 +468,6 @@ export class NotificationBotService {
       return;
     }
 
-    const botEntry = this.placeBots[placeId];
-
-    if (!botEntry) {
-      this.logger.log(
-        `No bot for ${place.name} - no subscriber notification performed`
-      );
-
-      return;
-    }
-
-    if (!botEntry.bot.isEnabled) {
-      this.logger.log(
-        `Bot for ${place.name} is disabled - skipping subscriber notification`
-      );
-
-      return;
-    }
-
-    const subscribers = await this.userRepository.getAllPlaceUserSubscriptions({
-      placeId,
-    });
-
-    this.logger.verbose(
-      `Notifying all ${subscribers.length} subscribers of ${place.name} about electricity availability change`
-    );
-
     const [latest, previous] =
       await this.electricityAvailabilityService.getLatestPlaceAvailability({
         placeId,
@@ -449,7 +476,7 @@ export class NotificationBotService {
 
     if (!latest) {
       this.logger.error(
-        `Electricity availability changed event, however no availability data in the repo for ${place.name}`
+        `Electricity availability changed event, however no availability data in the repo for ${placeId}`
       );
 
       return;
@@ -473,7 +500,9 @@ export class NotificationBotService {
         locale: uk,
         includeSeconds: false,
       });
-      const diffInMinutes = Math.abs(differenceInMinutes(previousTime, latestTime));
+      const diffInMinutes = Math.abs(
+        differenceInMinutes(previousTime, latestTime)
+      );
 
       response = latest.isAvailable
         ? RESP_ENABLED_DETAILED({ when, howLong, place: place.name })
@@ -482,9 +511,48 @@ export class NotificationBotService {
         : RESP_DISABLED_DETAILED({ when, howLong, place: place.name });
     }
 
+    this.notifyAllPlaceSubscribers({
+      place,
+      msg: response,
+    });
+  }
+
+  private async notifyAllPlaceSubscribers(params: {
+    readonly place: Place;
+    readonly msg: string;
+  }): Promise<void> {
+    const { place, msg } = params;
+    const botEntry = this.placeBots[place.id];
+
+    if (!botEntry) {
+      this.logger.log(
+        `No bot for ${place.name} - no subscriber notification performed`
+      );
+
+      return;
+    }
+
+    if (!botEntry.bot.isEnabled) {
+      this.logger.log(
+        `Bot for ${place.name} is disabled - skipping subscriber notification`
+      );
+
+      return;
+    }
+
+    const subscribers = await this.userRepository.getAllPlaceUserSubscriptions({
+      placeId: place.id,
+    });
+
+    this.logger.verbose(
+      `Notifying all ${subscribers.length} subscribers of ${place.name}`
+    );
+
     subscribers.forEach(({ chatId }) => {
       try {
-        botEntry.telegramBot.sendMessage(chatId, response, { parse_mode: 'HTML'});
+        botEntry.telegramBot.sendMessage(chatId, params.msg, {
+          parse_mode: 'HTML',
+        });
       } catch (e) {
         this.logger.error(
           `Failed to send notification to ${chatId} chat ID: ${JSON.stringify(
@@ -495,7 +563,7 @@ export class NotificationBotService {
     });
 
     this.logger.verbose(
-      `Finished notifying all ${subscribers.length} subscribers of ${place.name} about electricity availability change`
+      `Finished notifying all ${subscribers.length} subscribers of ${place.name}`
     );
   }
 
@@ -607,7 +675,10 @@ export class NotificationBotService {
       return '';
     }
 
-    const totalUsers = stats.reduce<number>((res, { numberOfUsers }) => res + Number(numberOfUsers), 0);
+    const totalUsers = stats.reduce<number>(
+      (res, { numberOfUsers }) => res + Number(numberOfUsers),
+      0
+    );
 
     let res = `Наразі сервісом користуються ${totalUsers} користувачів у ${stats.length} ботах:\n`;
 

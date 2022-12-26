@@ -48,7 +48,7 @@ export class ElectricityAvailabilityService {
   }
 
   // TODO: refactor (make cleaner)
-  public async getTodayeAndYesterdayStats(params: { readonly place: Place }): Promise<{
+  public async getTodayAndYesterdayStats(params: { readonly place: Place }): Promise<{
     readonly history: {
       readonly today?: Array<HistoryItem>;
       readonly yesterday?: Array<HistoryItem>;
