@@ -2,7 +2,13 @@ import { ElectricityRepository } from '@electrobot/electricity-repo';
 import { Injectable, Logger } from '@nestjs/common';
 import * as ping from 'ping';
 import { Subject } from 'rxjs';
-import { startOfToday, startOfYesterday } from 'date-fns';
+import {
+  differenceInMinutes,
+  endOfMonth,
+  startOfMonth,
+  startOfToday,
+  startOfYesterday,
+} from 'date-fns';
 import { convertToLocalTime, convertToTimeZone } from 'date-fns-timezone';
 import { HistoryItem } from './history-item.type';
 import { Place } from '@electrobot/domain';
@@ -44,11 +50,13 @@ export class ElectricityAvailabilityService {
       readonly isAvailable: boolean;
     }>
   > {
-    return this.electricityRepository.getLatestAvailability(params);
+    return this.electricityRepository.getAvailability(params);
   }
 
   // TODO: refactor (make cleaner)
-  public async getTodayAndYesterdayStats(params: { readonly place: Place }): Promise<{
+  public async getTodayAndYesterdayStats(params: {
+    readonly place: Place;
+  }): Promise<{
     readonly history: {
       readonly today?: Array<HistoryItem>;
       readonly yesterday?: Array<HistoryItem>;
@@ -66,7 +74,7 @@ export class ElectricityAvailabilityService {
     });
 
     const todayData = (
-      await this.electricityRepository.getLatestAvailability({
+      await this.electricityRepository.getAvailability({
         placeId: place.id,
         from: todayStart,
         till: now,
@@ -80,17 +88,16 @@ export class ElectricityAvailabilityService {
       end: now,
       sortedAvailabilityData: todayData,
     });
-    const beforeTodayRes =
-      await this.electricityRepository.getLatestAvailability({
-        placeId: place.id,
-        till: todayStart,
-        limit: 1,
-      });
+    const beforeTodayRes = await this.electricityRepository.getAvailability({
+      placeId: place.id,
+      till: todayStart,
+      limit: 1,
+    });
     const lastStateBeforeToday =
       beforeTodayRes.length > 0 ? beforeTodayRes[0].isAvailable : undefined;
 
     const yesterdayData = (
-      await this.electricityRepository.getLatestAvailability({
+      await this.electricityRepository.getAvailability({
         placeId: place.id,
         from: yesterdayStart,
         till: todayStart,
@@ -104,12 +111,13 @@ export class ElectricityAvailabilityService {
       end: todayStart,
       sortedAvailabilityData: yesterdayData,
     });
-    const beforeYesterdayRes =
-      await this.electricityRepository.getLatestAvailability({
+    const beforeYesterdayRes = await this.electricityRepository.getAvailability(
+      {
         placeId: place.id,
         till: yesterdayStart,
         limit: 1,
-      });
+      }
+    );
     const lastStateBeforeYesterday =
       beforeYesterdayRes.length > 0
         ? beforeYesterdayRes[0].isAvailable
@@ -122,6 +130,92 @@ export class ElectricityAvailabilityService {
       },
       lastStateBeforeToday,
       lastStateBeforeYesterday,
+    };
+  }
+
+  public async getMonthStatsMessage(params: {
+    readonly place: Place;
+    readonly dateFromTargetMonth: Date;
+  }): Promise<
+    | {
+        readonly monitoringFirstMoment: Date;
+        readonly totalMinutesAvailable: number;
+        readonly totalMinutesUnavailable: number;
+      }
+    | undefined
+  > {
+    const { place, dateFromTargetMonth } = params;
+    const monthStart = startOfMonth(dateFromTargetMonth);
+    const monthEnd = endOfMonth(dateFromTargetMonth);
+    let monthData = await this.electricityRepository.getAvailability({
+      placeId: place.id,
+      from: monthStart,
+      till: monthEnd,
+      orderBy: 'asc',
+    });
+
+    if (monthData.length <= 1) {
+      return undefined;
+    }
+
+    let monitoringFirstMoment = monthData[0].time;
+
+    const lastStateBeforeMonthStarted =
+      await this.electricityRepository.getAvailability({
+        placeId: place.id,
+        till: monthStart,
+        limit: 1,
+      });
+
+    if (lastStateBeforeMonthStarted.length > 0) {
+      monitoringFirstMoment = lastStateBeforeMonthStarted[0].time;
+
+      monthData = [
+        {
+          time: monthStart,
+          isAvailable: lastStateBeforeMonthStarted[0].isAvailable,
+        },
+        ...monthData,
+      ];
+    }
+
+    const firstStateAfterMonthStarted =
+      await this.electricityRepository.getAvailability({
+        placeId: place.id,
+        from: monthEnd,
+        limit: 1,
+        orderBy: 'asc',
+      });
+
+    if (firstStateAfterMonthStarted.length > 0) {
+      monthData = [
+        ...monthData,
+        {
+          time: monthEnd,
+          isAvailable: firstStateAfterMonthStarted[0].isAvailable,
+        },
+      ];
+    }
+
+    let totalMinutesAvailable = 0;
+    let totalMinutesUnavailable = 0;
+
+    for (let i = 0; i < monthData.length - 1; i++) {
+      const item = monthData[i];
+      const nextItem = monthData[i + 1];
+      const minutes = Math.abs(differenceInMinutes(nextItem.time, item.time));
+
+      if (item.isAvailable) {
+        totalMinutesAvailable += minutes;
+      } else {
+        totalMinutesUnavailable += minutes;
+      }
+    }
+
+    return {
+      monitoringFirstMoment,
+      totalMinutesAvailable,
+      totalMinutesUnavailable,
     };
   }
 
@@ -164,7 +258,7 @@ export class ElectricityAvailabilityService {
         currentTime = Date.now();
       }
 
-      const [latest] = await this.electricityRepository.getLatestAvailability({
+      const [latest] = await this.electricityRepository.getAvailability({
         placeId: place.id,
         limit: 1,
       });

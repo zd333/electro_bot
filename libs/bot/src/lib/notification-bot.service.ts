@@ -3,9 +3,11 @@ import { UserRepository } from '@electrobot/user-repo';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   addMinutes,
+  addMonths,
   differenceInMinutes,
   format,
   formatDistance,
+  getMonth,
 } from 'date-fns';
 import { convertToTimeZone } from 'date-fns-timezone';
 import { uk } from 'date-fns/locale';
@@ -26,6 +28,7 @@ import {
   RESP_DISABLED_SUSPICIOUS,
   RESP_ENABLED_DETAILED,
   RESP_ENABLED_SHORT,
+  RESP_PREVIOUS_MONTH_SUMMARY,
   RESP_NO_CURRENT_INFO,
   RESP_START,
   RESP_SUBSCRIPTION_ALREADY_EXISTS,
@@ -56,7 +59,7 @@ export class NotificationBotService {
   ) {
     this.refreshAllPlacesAndBots();
 
-    const refreshRate = 30 * 60 * 1000; // 30 min
+    const refreshRate = 10 * 60 * 1000; // 10 min
 
     setInterval(() => this.refreshAllPlacesAndBots(), refreshRate);
 
@@ -67,6 +70,14 @@ export class NotificationBotService {
         });
       }
     );
+  }
+
+  public async notifyAllPlacesAboutPreviousMonthStats(): Promise<void> {
+    const allPlaces = Object.values(this.places);
+
+    allPlaces.forEach(place => {
+      this.notifyAllPlaceSubscribersAboutPreviousMonthStats({ place });
+    });
   }
 
   private async handleStartCommand(params: {
@@ -93,7 +104,7 @@ export class NotificationBotService {
 
     const listedBotsMessage = await this.composeListedBotsMessage();
 
-    telegramBot.sendMessage(
+    await telegramBot.sendMessage(
       msg.chat.id,
       RESP_START({ place: place.name, listedBotsMessage }),
       { parse_mode: 'HTML' }
@@ -129,7 +140,7 @@ export class NotificationBotService {
       });
 
     if (!latest) {
-      telegramBot.sendMessage(
+      await telegramBot.sendMessage(
         msg.chat.id,
         RESP_NO_CURRENT_INFO({ place: place.name }),
         { parse_mode: 'HTML' }
@@ -151,7 +162,7 @@ export class NotificationBotService {
       ? RESP_CURRENTLY_AVAILABLE({ when, howLong, place: place.name })
       : RESP_CURRENTLY_UNAVAILABLE({ when, howLong, place: place.name });
 
-    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
+    await telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
   }
 
   private async handleSubscribeCommand(params: {
@@ -184,7 +195,7 @@ export class NotificationBotService {
       ? RESP_SUBSCRIPTION_CREATED({ place: place.name })
       : RESP_SUBSCRIPTION_ALREADY_EXISTS({ place: place.name });
 
-    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
+    await telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
   }
 
   private async handleUnsubscribeCommand(params: {
@@ -217,7 +228,7 @@ export class NotificationBotService {
       ? RESP_UNSUBSCRIBED({ place: place.name })
       : RESP_WAS_NOT_SUBSCRIBED({ place: place.name });
 
-    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
+    await telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
   }
 
   // TODO: refactor (make cleaner)
@@ -424,7 +435,67 @@ export class NotificationBotService {
 
     response += `\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 
-    telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
+    await telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
+  }
+
+  private async composePlaceMonthStatsMessage(params: {
+    readonly place: Place;
+    readonly dateFromTargetMonth: Date;
+  }): Promise<string> {
+    const monthStats = await this.electricityAvailabilityService.getMonthStatsMessage(params);
+
+    if (!monthStats) {
+      return '';
+    }
+
+    const totalMinutes = monthStats.totalMinutesAvailable + monthStats.totalMinutesUnavailable;
+    const percentAvailable = Math.floor(100 * monthStats.totalMinutesAvailable / totalMinutes);
+    const percentUnavailable = 100 - percentAvailable;
+    const baseDate = convertToTimeZone(new Date(), { timeZone: params.place.timezone });
+    const baseDatePlusAvailable = addMinutes(
+      baseDate,
+      monthStats.totalMinutesAvailable
+    );
+    const howLongAvailable = formatDistance(baseDate, baseDatePlusAvailable, {
+      locale: uk,
+      includeSeconds: false,
+    });
+    const baseDatePlusUnavailable = addMinutes(
+      baseDate,
+      monthStats.totalMinutesUnavailable
+    );
+    const howLongUnavailable = formatDistance(baseDate, baseDatePlusUnavailable, {
+      locale: uk,
+      includeSeconds: false,
+    });
+
+    const m = getMonth(params.dateFromTargetMonth);
+    const mn =
+      m === 0
+        ? 'січні'
+        : m === 1
+        ? 'лютому'
+        : m === 2
+        ? 'березні'
+        : m === 3
+        ? 'квітні'
+        : m === 4
+        ? 'травні'
+        : m === 5
+        ? 'червні'
+        : m === 6
+        ? 'липні'
+        : m === 7
+        ? 'серпні'
+        : m === 8
+        ? 'вересні'
+        : m === 9
+        ? 'жовтні'
+        : m === 10
+        ? 'листопаді'
+        : 'грудні';
+
+    return `У ${mn} ми насолоджувалися світлом ${percentAvailable}% часу (сумарно ${howLongAvailable}) і потерпали від темряви ${percentUnavailable}% часу (сумарно ${howLongUnavailable}).`;
   }
 
   private async handleAboutCommand(params: {
@@ -449,7 +520,7 @@ export class NotificationBotService {
 
     const listedBotsMessage = await this.composeListedBotsMessage();
 
-    telegramBot.sendMessage(msg.chat.id, RESP_ABOUT({ listedBotsMessage }), {
+    await telegramBot.sendMessage(msg.chat.id, RESP_ABOUT({ listedBotsMessage }), {
       parse_mode: 'HTML',
     });
   }
@@ -517,6 +588,29 @@ export class NotificationBotService {
     });
   }
 
+  private async notifyAllPlaceSubscribersAboutPreviousMonthStats(params: {
+    readonly place: Place;
+  }): Promise<void> {
+    const { place } = params;
+    const dateFromPreviousMonth = addMonths(new Date(), -1);
+    const statsMessage = await this.composePlaceMonthStatsMessage({ place, dateFromTargetMonth: dateFromPreviousMonth });
+
+    if (!statsMessage) {
+      this.logger.error(
+        `No monthly stats for ${place.name} - skipping subscriber notification`
+      );
+
+      return;
+    }
+
+    const response = RESP_PREVIOUS_MONTH_SUMMARY({ statsMessage });
+
+    this.notifyAllPlaceSubscribers({
+      place,
+      msg: response,
+    });
+  }
+
   private async notifyAllPlaceSubscribers(params: {
     readonly place: Place;
     readonly msg: string;
@@ -548,9 +642,9 @@ export class NotificationBotService {
       `Notifying all ${subscribers.length} subscribers of ${place.name}`
     );
 
-    subscribers.forEach(({ chatId }) => {
+    subscribers.forEach(async ({ chatId }) => {
       try {
-        botEntry.telegramBot.sendMessage(chatId, params.msg, {
+        await botEntry.telegramBot.sendMessage(chatId, msg, {
           parse_mode: 'HTML',
         });
       } catch (e) {
@@ -683,7 +777,7 @@ export class NotificationBotService {
     let res = `Наразі сервісом користуються ${totalUsers} користувачів у ${stats.length} ботах:\n`;
 
     stats.forEach(({ placeName, botName, numberOfUsers }) => {
-      res += `@${botName}\n${placeName} - ${numberOfUsers} користувачів\n`;
+      res += `@${botName}\n${placeName}: ${numberOfUsers} користувачів\n`;
     });
 
     return res + '\n';
