@@ -3,6 +3,7 @@ export interface RepoPlace {
   readonly name: string;
   readonly timezone: string;
   readonly host: string;
+  readonly check_type: 'ping' | 'http';
   readonly unavailability_treshold_minutes: number | null;
   readonly created_at: Date;
 }

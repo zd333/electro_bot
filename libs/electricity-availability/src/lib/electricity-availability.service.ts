@@ -1,7 +1,8 @@
 import { ElectricityRepository } from '@electrobot/electricity-repo';
 import { Injectable, Logger } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import * as ping from 'ping';
-import { Subject } from 'rxjs';
+import { firstValueFrom, Subject } from 'rxjs';
 import {
   differenceInMinutes,
   endOfMonth,
@@ -28,6 +29,7 @@ export class ElectricityAvailabilityService {
     this._availabilityChange$.asObservable();
 
   constructor(
+    private readonly httpService: HttpService,
     private readonly electricityRepository: ElectricityRepository,
     private readonly placeRepository: PlaceRepository
   ) {}
@@ -238,50 +240,68 @@ export class ElectricityAvailabilityService {
 
     this.isCheckingPlaceAvailability[place.id] = true;
 
-    try {
-      let alive = false;
-      let currentTime = Date.now();
-      const tresholdMinutes =
-        place.unavailabilityTresholdMinutes ?? DEFAULT_TRESHOLD_MINUTES;
-      const tresholdMilliseconds = tresholdMinutes * 60 * 1000;
-      const finishTime = currentTime + tresholdMilliseconds;
+    let alive = false;
+    let currentTime = Date.now();
+    const tresholdMinutes =
+      place.unavailabilityTresholdMinutes ?? DEFAULT_TRESHOLD_MINUTES;
+    const tresholdMilliseconds = tresholdMinutes * 60 * 1000;
+    const finishTime = currentTime + tresholdMilliseconds;
 
-      while (!alive && currentTime < finishTime) {
+    while (!alive && currentTime < finishTime) {
+      if (place.checkType === 'ping') {
         const res = await ping.promise.probe(place.host);
 
         alive = res.alive;
+      } else if (place.checkType === 'http') {
+        try {
+          const httpRes = await firstValueFrom(this.httpService.get(params.place.host, {
+            timeout: 1000,
+          }));
 
-        if (!alive) {
-          await this.sleep({ ms: 1 * 1000 }); // 1s
+          this.logger.verbose(`HTTP ${params.place.host} successful check result for ${place.name}: ${httpRes.status} status code`);
+
+          alive = true;
+        } catch(e) {
+          this.logger.verbose(`HTTP ${params.place.host} unsuccessful check result for ${place.name}: ${e}`);
+
+          alive = false;
         }
-
-        currentTime = Date.now();
-      }
-
-      const [latest] = await this.electricityRepository.getAvailability({
-        placeId: place.id,
-        limit: 1,
-      });
-
-      if (latest?.isAvailable === alive) {
-        this.isCheckingPlaceAvailability[place.id] = false;
+      } else {
+        this.logger.error(
+          `Unsupported ${place.checkType} check type for ${place.name}`
+        );
 
         return;
       }
 
-      await this.electricityRepository.saveAvailability({
-        placeId: place.id,
-        isAvailable: alive,
-      });
+      if (!alive) {
+        await this.sleep({ ms: 1 * 1000 }); // 1s
+      }
 
-      this._availabilityChange$.next({ placeId: place.id });
-
-      this.logger.verbose(
-        `Availability state of ${place.name} changed from ${latest?.isAvailable} to ${alive}, saving`
-      );
-    } catch (e) {
-      //
+      currentTime = Date.now();
     }
+
+    const [latest] = await this.electricityRepository.getAvailability({
+      placeId: place.id,
+      limit: 1,
+    });
+
+    if (latest?.isAvailable === alive) {
+      this.isCheckingPlaceAvailability[place.id] = false;
+
+      return;
+    }
+
+    await this.electricityRepository.saveAvailability({
+      placeId: place.id,
+      isAvailable: alive,
+    });
+
+    this._availabilityChange$.next({ placeId: place.id });
+
+    this.logger.verbose(
+      `Availability state of ${place.name} changed from ${latest?.isAvailable} to ${alive}, saving`
+    );
 
     this.isCheckingPlaceAvailability[place.id] = false;
   }
@@ -326,6 +346,6 @@ export class ElectricityAvailabilityService {
   }
 
   private async sleep(params: { readonly ms: number }): Promise<void> {
-    new Promise((r) => setTimeout(r, params.ms));
+    return new Promise((r) => setTimeout(r, params.ms));
   }
 }

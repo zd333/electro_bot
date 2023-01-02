@@ -13,11 +13,12 @@ export class PlaceRepository {
       .select<Array<RepoPlace>>('*')
       .from('place');
 
-    return queryRes.map(({ id, name, timezone, host, unavailability_treshold_minutes }) => ({
+    return queryRes.map(({ id, name, timezone, host, check_type, unavailability_treshold_minutes }) => ({
       id,
       name,
       timezone,
       host,
+      checkType: check_type,
       unavailabilityTresholdMinutes: unavailability_treshold_minutes ?? undefined,
     }));
   }
