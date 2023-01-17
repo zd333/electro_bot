@@ -2,7 +2,7 @@ import * as Emoji from 'node-emoji';
 import { VERSION } from '@electrobot/domain';
 
 export const EMOJ_UA = Emoji.get(Emoji.emoji['flag-ua']);
-export const EMOJ_POOP = Emoji.get(Emoji.emoji['poop']);
+export const EMOJ_PERSERVE = Emoji.get(Emoji.emoji['persevere']);
 export const EMOJ_BULB = Emoji.get(Emoji.emoji['bulb']);
 export const EMOJ_MOON = Emoji.get(Emoji.emoji['new_moon_with_face']);
 export const EMOJ_HALF_MOON = Emoji.get(Emoji.emoji['waning_crescent_moon']);
@@ -10,13 +10,9 @@ export const EMOJ_KISS = Emoji.get(Emoji.emoji['kiss']);
 export const EMOJ_KISS_HEART = Emoji.get(Emoji.emoji['kissing_heart']);
 export const EMOJ_HEART = Emoji.get(Emoji.emoji['heart']);
 
-export const MSG_DISABLED_REASON = `Причина вимкнення - йо#ана русня!${EMOJ_POOP}`;
 export const MSG_DISABLED_REGULAR_SUFFIX =
-  'Скеруй лють до русні підтримавши українську армію!\n' +
+  'Не забувай підтримувати українську армію!\n' +
   'Ось один із зручних способів зробити донат: @Donate1024Bot.';
-export const MSG_DISABLED_SUSPICIOUS_TIME_SUFFIX =
-  'Увага! Контроль наявності світла відбувається за допомогою перевірки Інтернет зв‘язку!\n' +
-  'У разі проблем з Інтернетом бот може видавати невірну інформацію (повідомляти про відключення світла, коли світло насправді є)!';
 
 export const MSG_LAUNCH_DOC_LINK =
   '<a href="https://zd333.github.io/electro_bot/doc/launch-bot-for-my-place.html">Як ти можеш запустити такого бота для власної локації без всякого програмування</a>';
@@ -51,7 +47,7 @@ export const RESP_CURRENTLY_UNAVAILABLE = (params: {
   readonly place: string;
 }) =>
   `${EMOJ_MOON} Нажаль, наразі світла в ${params.place} нема.\nВимкнення відбулося ${params.when}.\n` +
-  `Світло відсутнє вже ${params.howLong}.\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
+  `Світло відсутнє вже ${params.howLong}.\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 export const RESP_SUBSCRIPTION_CREATED = (params: { readonly place: string }) =>
   `Підписка створена - ти будеш отримувати повідомлення кожного разу після зміни ситуації зі світлом в ${params.place}.\n` +
   `Ти завжди можеш відписатися за допомогою команди /unsubscribe.`;
@@ -80,7 +76,7 @@ export const RESP_DISABLED_SHORT = (params: {
   readonly when: string;
   readonly place: string;
 }) =>
-  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params} вимкнено!\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
+  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params} вимкнено!\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 export const RESP_ENABLED_DETAILED = (params: {
   readonly when: string;
   readonly howLong: string;
@@ -88,19 +84,25 @@ export const RESP_ENABLED_DETAILED = (params: {
 }) =>
   `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${params.place} включили!\nСвітло було відсутнє ${params.howLong}.\n\n` +
   `Слава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+export const RESP_ENABLED_SUSPICIOUS = (params: {
+    readonly when: string;
+    readonly place: string;
+  }) =>
+    `${EMOJ_BULB} ${params.when}\nСхоже, що, світло в ${params.place} включили!\n` +
+    `Хоча можливо його і не виключали, а це наспраді була проблема з Інтернетом ${EMOJ_PERSERVE}.`;
 export const RESP_DISABLED_DETAILED = (params: {
   readonly when: string;
   readonly howLong: string;
   readonly place: string;
 }) =>
   `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params.place} вимкнено!\n` +
-  `Ми насолоджувалися світлом ${params.howLong}.\n\n${MSG_DISABLED_REASON}\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
+  `Ми насолоджувалися світлом ${params.howLong}.\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 export const RESP_DISABLED_SUSPICIOUS = (params: {
   readonly when: string;
   readonly place: string;
 }) =>
   `${EMOJ_HALF_MOON} ${params.when}\nКарамба, можливо світло в ${params.place} вимкнено!\n\n` +
-  MSG_DISABLED_SUSPICIOUS_TIME_SUFFIX;
+  `Хоча це може бути просто проблема з Інтернетом і світло наспраді не вимикали ${EMOJ_PERSERVE}.`;
 export const RESP_PREVIOUS_MONTH_SUMMARY = (params: {
   readonly statsMessage: string;
 }) =>

@@ -35,6 +35,7 @@ import {
   RESP_SUBSCRIPTION_CREATED,
   RESP_UNSUBSCRIBED,
   RESP_WAS_NOT_SUBSCRIBED,
+  RESP_ENABLED_SUSPICIOUS,
 } from './messages.constant';
 
 const MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES = 45;
@@ -575,11 +576,15 @@ export class NotificationBotService {
         differenceInMinutes(previousTime, latestTime)
       );
 
-      response = latest.isAvailable
-        ? RESP_ENABLED_DETAILED({ when, howLong, place: place.name })
-        : diffInMinutes <= MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES
-        ? RESP_DISABLED_SUSPICIOUS({ when, place: place.name })
-        : RESP_DISABLED_DETAILED({ when, howLong, place: place.name });
+      if (latest.isAvailable) {
+        response = diffInMinutes <= MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES
+          ? RESP_ENABLED_SUSPICIOUS({ when, place: place.name })
+          : RESP_ENABLED_DETAILED({ when, howLong, place: place.name })
+      } else {
+        response = diffInMinutes <= MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES
+          ? RESP_DISABLED_SUSPICIOUS({ when, place: place.name })
+          : RESP_DISABLED_DETAILED({ when, howLong, place: place.name });
+      }
     }
 
     this.notifyAllPlaceSubscribers({
