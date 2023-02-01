@@ -38,7 +38,7 @@ import {
   RESP_ENABLED_SUSPICIOUS,
 } from './messages.constant';
 
-const MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES = 45;
+const MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES = 30;
 
 @Injectable()
 export class NotificationBotService {
@@ -76,9 +76,9 @@ export class NotificationBotService {
   public async notifyAllPlacesAboutPreviousMonthStats(): Promise<void> {
     const allPlaces = Object.values(this.places);
 
-    allPlaces.forEach(place => {
-      this.notifyAllPlaceSubscribersAboutPreviousMonthStats({ place });
-    });
+    for (const place of allPlaces) {
+      await this.notifyAllPlaceSubscribersAboutPreviousMonthStats({ place });
+    }
   }
 
   private async handleStartCommand(params: {
@@ -647,7 +647,9 @@ export class NotificationBotService {
       `Notifying all ${subscribers.length} subscribers of ${place.name}`
     );
 
-    subscribers.forEach(async ({ chatId }) => {
+    for (const subscriber of subscribers) {
+      const { chatId } = subscriber;
+
       try {
         await botEntry.telegramBot.sendMessage(chatId, msg, {
           parse_mode: 'HTML',
@@ -659,7 +661,7 @@ export class NotificationBotService {
           )}`
         );
       }
-    });
+    }
 
     this.logger.verbose(
       `Finished notifying all ${subscribers.length} subscribers of ${place.name}`

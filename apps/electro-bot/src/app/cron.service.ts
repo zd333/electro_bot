@@ -17,7 +17,7 @@ export class CronService {
     await this.electricityAvailabilityService.checkAndSaveElectricityAvailabilityStateOfAllPlaces();
   }
 
-  @Cron('0 0 9 1 * *')
+  @Cron('0 0 10 1 * *')
   public async notifyAllPlacesAboutPreviousMonthStats(): Promise<void> {
     this.logger.verbose('Notifying all places about previous month stats');
 

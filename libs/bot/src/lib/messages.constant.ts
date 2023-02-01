@@ -89,7 +89,7 @@ export const RESP_ENABLED_SUSPICIOUS = (params: {
     readonly place: string;
   }) =>
     `${EMOJ_BULB} ${params.when}\nСхоже, що, світло в ${params.place} включили!\n` +
-    `Хоча можливо його і не виключали, а це наспраді була проблема з Інтернетом ${EMOJ_PERSERVE}.`;
+    `Хоча можливо його і не виключали, а це насправді була проблема з Інтернетом ${EMOJ_PERSERVE}.`;
 export const RESP_DISABLED_DETAILED = (params: {
   readonly when: string;
   readonly howLong: string;
@@ -102,7 +102,7 @@ export const RESP_DISABLED_SUSPICIOUS = (params: {
   readonly place: string;
 }) =>
   `${EMOJ_HALF_MOON} ${params.when}\nКарамба, можливо світло в ${params.place} вимкнено!\n\n` +
-  `Хоча це може бути просто проблема з Інтернетом і світло наспраді не вимикали ${EMOJ_PERSERVE}.`;
+  `Хоча це може бути просто проблема з Інтернетом і світло насправді не вимикали ${EMOJ_PERSERVE}.`;
 export const RESP_PREVIOUS_MONTH_SUMMARY = (params: {
   readonly statsMessage: string;
 }) =>
