@@ -9,6 +9,8 @@ export const EMOJ_HALF_MOON = Emoji.get(Emoji.emoji['waning_crescent_moon']);
 export const EMOJ_KISS = Emoji.get(Emoji.emoji['kiss']);
 export const EMOJ_KISS_HEART = Emoji.get(Emoji.emoji['kissing_heart']);
 export const EMOJ_HEART = Emoji.get(Emoji.emoji['heart']);
+export const EMOJ_SMILING_IMP = Emoji.get(Emoji.emoji['smiling_imp']);
+export const EMOJ_POOP = Emoji.get(Emoji.emoji['poop']);
 
 export const MSG_DISABLED_REGULAR_SUFFIX =
   'Не забувай підтримувати українську армію!\n' +
@@ -111,7 +113,13 @@ export const RESP_PREVIOUS_MONTH_SUMMARY = (params: {
   `Ось і закінчився черговий місяць, в якому електрика і світло мають для нас особливе значення.\n\n` +
   params.statsMessage +
   '\n\n' +
+  'Декілька цікавих фактів минулого місяця:\n' +
+  // TODO: move this to DB so that no need to deploy to change content
+  `${EMOJ_HEART} Важка атлетика - королева спорту\n` +
+  `${EMOJ_SMILING_IMP} Всі мотоциклісти - гімнюки\n` +
+  `${EMOJ_POOP} тищенко - Пі#ор!\n` +
+  '\n' +
   `Не сумуй, що час пролетів так швидко, адже тепер ми на місяць ближче до Перемоги!\n\n` +
-  `Посміхайся, радій життю, ЗАЙМАЙСЯ ВАЖКОЮ АТЛЕТИКОЮ ${EMOJ_HEART} та не забувай підтримувати ЗСУ!\n\n` +
+  `Посміхайся, радій життю та не забувай підтримувати Українську Армію${EMOJ_HEART}!\n\n` +
   `${EMOJ_KISS_HEART}${EMOJ_KISS_HEART}${EMOJ_KISS_HEART}\n` +
   `${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;

@@ -601,7 +601,7 @@ export class NotificationBotService {
     const statsMessage = await this.composePlaceMonthStatsMessage({ place, dateFromTargetMonth: dateFromPreviousMonth });
 
     if (!statsMessage) {
-      this.logger.error(
+      this.logger.verbose(
         `No monthly stats for ${place.name} - skipping subscriber notification`
       );
 
@@ -654,7 +654,20 @@ export class NotificationBotService {
         await botEntry.telegramBot.sendMessage(chatId, msg, {
           parse_mode: 'HTML',
         });
-      } catch (e) {
+      } catch (e: any) {
+        // Below error means that user blocked bot, so we should remove subscription
+        // `{"code":"ETELEGRAM","message":"ETELEGRAM: 403 Forbidden: bot was blocked by the user"}`
+        if (e?.code === 'ETELEGRAM' && e?.message?.includes('403') && e.message?.includes('blocked by the user')) {
+          this.logger.verbose(`Failed to send notification to ${chatId} chat ID since it blocked the bot. Thus removing subscription: ${JSON.stringify(e)}`);
+
+            await this.userRepository.removeUserSubscription({
+              placeId: place.id,
+              chatId,
+            });
+
+            continue;
+        }
+
         this.logger.error(
           `Failed to send notification to ${chatId} chat ID: ${JSON.stringify(
             e
@@ -692,6 +705,12 @@ export class NotificationBotService {
       const placeBots = await this.placeRepository.getAllPlaceBots();
 
       placeBots.forEach((bot) => {
+        if (!bot.isEnabled) {
+          // !This will only skip bot on first creation, but will not disable already created bot
+          // !So app restart is needed to stop bot polling
+          return;
+        }
+
         if (this.placeBots[bot.placeId]) {
           // Already created, rewrite bot data (to apply enabled/disabled), but keep same Telegram bot instance
           this.placeBots[bot.placeId] = {
@@ -732,6 +751,10 @@ export class NotificationBotService {
       bot,
       telegramBot,
     };
+
+    telegramBot.on('polling_error', (error) => {
+      this.logger.error(`${place.name}/${bot.botName} polling error: ${error}`);
+    });
 
     // Matches /start
     telegramBot.onText(/\/start/, (msg) =>

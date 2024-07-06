@@ -4,7 +4,7 @@ Pet project to track information about electricity outages.
 
 ## Prerequisites
 
-- install NodeJS, nvm, flyctl
+- install NodeJS, nvm, fly console
 - `nvm use`
 - `npm ci`
 - see [https://fly.io/docs](https://fly.io/docs)
@@ -25,7 +25,7 @@ Pet project to track information about electricity outages.
 
 ## Connect to remote Postgre
 
-Staging: `flyctl proxy 5433 -a pg-electro-bot-stg`, production: `flyctl proxy 5433 -a pg-electro-bot`.
+Staging: `fly proxy 5433 -a pg-electro-bot-stg`, production: `fly proxy 5433 -a pg-electro-bot`.
 
 ## Deploy
 
@@ -35,30 +35,30 @@ TODO: this is tmp solution that causes downtime during deployment, come up with 
 
 Staging:
 
-- `flyctl --config fly.stg.toml scale count 0`
-- `flyctl --config fly.stg.toml deploy`
-- `flyctl --config fly.stg.toml scale count 1`
+- `fly --config fly.stg.toml scale count 0`
+- `fly --config fly.stg.toml deploy`
+- `fly --config fly.stg.toml scale count 1`
 
 Production:
 
-- `flyctl scale count 0`
-- `flyctl deploy`
-- `flyctl scale count 1`
+- `fly scale count 0`
+- `fly deploy`
+- `fly scale count 1`
 
 ## Restart
 
-Staging: `flyctl apps restart electrobotstg`, production: `flyctl apps restart electrobot`.
+Staging: `fly apps restart electrobotstg`, production: `fly apps restart electrobot`.
 
 ## Logs
 
-Staging: `flyctl --config fly.stg.toml logs`, production: `flyctl logs`.
+Staging: `fly --config fly.stg.toml logs`, production: `fly logs`.
 
 ## Recreate builder
 
 Do this when no space left on builder device:
 
-- `flyctl apps list | grep builder`
-- `flyctl apps destroy <name>`
+- `fly apps list | grep builder`
+- `fly apps destroy <name>`
 
 ## Generate HTML docs
 
