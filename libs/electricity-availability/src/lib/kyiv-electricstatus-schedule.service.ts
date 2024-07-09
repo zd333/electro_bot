@@ -9,7 +9,7 @@ import {
   differenceInMinutes,
 } from 'date-fns';
 
-const ALL_GROUPS = [1, 2, 3, 4, 5, 6, 7];
+const ALL_GROUPS = [1, 2, 3, 4, 5, 6];
 const DELAY_BETWEEN_REQUESTS_MS = 100;
 const NEXT_AVAILABILITY_CHANGE_MIN_DIFFERENCE_MINUTES = 29;
 const CACHE_REFRESH_MS = 1000 * 60 * 10; // 10 minutes
@@ -70,7 +70,7 @@ export class KyivElectricstatusScheduleService {
     const tomorrowData = data[tomorrowDayOfWeek];
 
     let nextEnableMoment: Date | undefined = todayData.power_on
-      .map(({ start }) => parse(start, 'HH:mm', now))
+      .map(({ time: { start} }) => parse(start, 'HH:mm', now))
       .find(
         (date) =>
           differenceInMinutes(date, now) >
@@ -78,11 +78,11 @@ export class KyivElectricstatusScheduleService {
       );
 
     if (!nextEnableMoment && tomorrowData.power_on.length) {
-      nextEnableMoment = parse(tomorrowData.power_on[0].start, 'HH:mm', now);
+      nextEnableMoment = parse(tomorrowData.power_on[0].time.start, 'HH:mm', now);
     }
 
     let nextPossibleEnableMoment: Date | undefined = todayData.power_on_possible
-      .map(({ start }) => parse(start, 'HH:mm', now))
+      .map(({ time: { start } }) => parse(start, 'HH:mm', now))
       .find(
         (date) =>
           differenceInMinutes(date, now) >
@@ -91,14 +91,14 @@ export class KyivElectricstatusScheduleService {
 
     if (!nextPossibleEnableMoment && tomorrowData.power_on_possible.length) {
       nextPossibleEnableMoment = parse(
-        tomorrowData.power_on_possible[0].start,
+        tomorrowData.power_on_possible[0].time.start,
         'HH:mm',
         now
       );
     }
 
     let nextDisableMoment: Date | undefined = todayData.power_off
-      .map(({ start }) => parse(start, 'HH:mm', now))
+      .map(({ time: { start } }) => parse(start, 'HH:mm', now))
       .find(
         (date) =>
           differenceInMinutes(date, now) >
@@ -106,12 +106,12 @@ export class KyivElectricstatusScheduleService {
       );
 
     if (!nextDisableMoment && tomorrowData.power_off.length) {
-      nextDisableMoment = parse(tomorrowData.power_off[0].start, 'HH:mm', now);
+      nextDisableMoment = parse(tomorrowData.power_off[0].time.start, 'HH:mm', now);
     }
 
     let nextPossibleDisableMoment: Date | undefined =
       todayData.power_on_possible
-        .map(({ end }) => parse(end, 'HH:mm', now))
+        .map(({ time: { end } }) => parse(end, 'HH:mm', now))
         .find(
           (date) =>
             differenceInMinutes(date, now) >
@@ -120,7 +120,7 @@ export class KyivElectricstatusScheduleService {
 
     if (!nextPossibleDisableMoment && tomorrowData.power_on_possible.length) {
       nextPossibleDisableMoment = parse(
-        tomorrowData.power_on_possible[0].end,
+        tomorrowData.power_on_possible[0].time.end,
         'HH:mm',
         now
       );
@@ -163,7 +163,9 @@ export class KyivElectricstatusScheduleService {
         const data: ScheduleResponse = httpRes.data;
 
         this.logger.verbose(
-          `Got schedule data for group ${group}, refreshing the cache: ${JSON.stringify(data)}`
+          `Got schedule data for group ${group}, refreshing the cache: ${JSON.stringify(
+            data
+          )}`
         );
 
         this.cache[group] = {
@@ -200,9 +202,11 @@ export class KyivElectricstatusScheduleService {
 }
 
 interface ScheduleMoment {
-  // This is time of the day in 24h format in Kyiv timezone (e.g. "04:00" or "22:00")
-  readonly start: string;
-  readonly end: string;
+  readonly time: {
+    // This is time of the day in 24h format in Kyiv timezone (e.g. "04:00" or "22:00")
+    readonly start: string;
+    readonly end: string;
+  };
 }
 
 interface ScheduleDay {
