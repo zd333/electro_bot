@@ -83,8 +83,8 @@ export class NotificationBotService {
     const allPlaces = Object.values(this.places);
 
     for (const place of allPlaces) {
-      if (place.isDisabled) {
-        this.logger.verbose(`Skipping disabled place ${place.name}`);
+      if (place.isDisabled || place.disableMonthlyStats) {
+        this.logger.verbose(`Skipping monthly notification for ${place.name}`);
 
         continue;
       }

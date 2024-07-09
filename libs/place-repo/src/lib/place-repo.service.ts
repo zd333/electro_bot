@@ -21,6 +21,7 @@ export class PlaceRepository {
         host,
         check_type,
         unavailability_treshold_minutes,
+        disable_monthly_stats,
         kyiv_schedule_group_id,
         is_disabled,
       }) => ({
@@ -31,6 +32,7 @@ export class PlaceRepository {
         checkType: check_type,
         unavailabilityTresholdMinutes:
           unavailability_treshold_minutes ?? undefined,
+        disableMonthlyStats: disable_monthly_stats,
         kyivScheduleGroupId: kyiv_schedule_group_id ?? undefined,
         isDisabled: is_disabled,
       })
