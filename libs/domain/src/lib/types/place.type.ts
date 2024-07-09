@@ -5,4 +5,5 @@ export interface Place {
   readonly host: string;
   readonly checkType: 'ping' | 'http';
   readonly unavailabilityTresholdMinutes?: number;
+  readonly isDisabled: boolean;
 }

@@ -36,6 +36,7 @@ import {
   RESP_UNSUBSCRIBED,
   RESP_WAS_NOT_SUBSCRIBED,
   RESP_ENABLED_SUSPICIOUS,
+  MSG_DISABLED,
 } from './messages.constant';
 
 const MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES = 30;
@@ -77,6 +78,12 @@ export class NotificationBotService {
     const allPlaces = Object.values(this.places);
 
     for (const place of allPlaces) {
+      if (place.isDisabled) {
+        this.logger.log(`Skipping disabled place ${place.name}`);
+
+        continue;
+      }
+
       await this.notifyAllPlaceSubscribersAboutPreviousMonthStats({ place });
     }
   }
@@ -91,6 +98,12 @@ export class NotificationBotService {
 
     if (this.isGroup({ chatId: msg.chat.id })) {
       this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
+    if (place.isDisabled) {
+      await this.notifyBotDisabled({ chatId: msg.chat.id, telegramBot });
 
       return;
     }
@@ -122,6 +135,12 @@ export class NotificationBotService {
 
     if (this.isGroup({ chatId: msg.chat.id })) {
       this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
+    if (place.isDisabled) {
+      await this.notifyBotDisabled({ chatId: msg.chat.id, telegramBot });
 
       return;
     }
@@ -163,7 +182,9 @@ export class NotificationBotService {
       ? RESP_CURRENTLY_AVAILABLE({ when, howLong, place: place.name })
       : RESP_CURRENTLY_UNAVAILABLE({ when, howLong, place: place.name });
 
-    await telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
+    await telegramBot.sendMessage(msg.chat.id, response, {
+      parse_mode: 'HTML',
+    });
   }
 
   private async handleSubscribeCommand(params: {
@@ -176,6 +197,12 @@ export class NotificationBotService {
 
     if (this.isGroup({ chatId: msg.chat.id })) {
       this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
+    if (place.isDisabled) {
+      await this.notifyBotDisabled({ chatId: msg.chat.id, telegramBot });
 
       return;
     }
@@ -196,7 +223,9 @@ export class NotificationBotService {
       ? RESP_SUBSCRIPTION_CREATED({ place: place.name })
       : RESP_SUBSCRIPTION_ALREADY_EXISTS({ place: place.name });
 
-    await telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
+    await telegramBot.sendMessage(msg.chat.id, response, {
+      parse_mode: 'HTML',
+    });
   }
 
   private async handleUnsubscribeCommand(params: {
@@ -229,7 +258,9 @@ export class NotificationBotService {
       ? RESP_UNSUBSCRIBED({ place: place.name })
       : RESP_WAS_NOT_SUBSCRIBED({ place: place.name });
 
-    await telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
+    await telegramBot.sendMessage(msg.chat.id, response, {
+      parse_mode: 'HTML',
+    });
   }
 
   // TODO: refactor (make cleaner)
@@ -243,6 +274,12 @@ export class NotificationBotService {
 
     if (this.isGroup({ chatId: msg.chat.id })) {
       this.logger.warn(`Skipping group message: ${JSON.stringify(msg)}`);
+
+      return;
+    }
+
+    if (place.isDisabled) {
+      await this.notifyBotDisabled({ chatId: msg.chat.id, telegramBot });
 
       return;
     }
@@ -436,23 +473,31 @@ export class NotificationBotService {
 
     response += `\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 
-    await telegramBot.sendMessage(msg.chat.id, response, { parse_mode: 'HTML' });
+    await telegramBot.sendMessage(msg.chat.id, response, {
+      parse_mode: 'HTML',
+    });
   }
 
   private async composePlaceMonthStatsMessage(params: {
     readonly place: Place;
     readonly dateFromTargetMonth: Date;
   }): Promise<string> {
-    const monthStats = await this.electricityAvailabilityService.getMonthStatsMessage(params);
+    const monthStats =
+      await this.electricityAvailabilityService.getMonthStatsMessage(params);
 
     if (!monthStats) {
       return '';
     }
 
-    const totalMinutes = monthStats.totalMinutesAvailable + monthStats.totalMinutesUnavailable;
-    const percentAvailable = Math.floor(100 * monthStats.totalMinutesAvailable / totalMinutes);
+    const totalMinutes =
+      monthStats.totalMinutesAvailable + monthStats.totalMinutesUnavailable;
+    const percentAvailable = Math.floor(
+      (100 * monthStats.totalMinutesAvailable) / totalMinutes
+    );
     const percentUnavailable = 100 - percentAvailable;
-    const baseDate = convertToTimeZone(new Date(), { timeZone: params.place.timezone });
+    const baseDate = convertToTimeZone(new Date(), {
+      timeZone: params.place.timezone,
+    });
     const baseDatePlusAvailable = addMinutes(
       baseDate,
       monthStats.totalMinutesAvailable
@@ -465,10 +510,14 @@ export class NotificationBotService {
       baseDate,
       monthStats.totalMinutesUnavailable
     );
-    const howLongUnavailable = formatDistance(baseDate, baseDatePlusUnavailable, {
-      locale: uk,
-      includeSeconds: false,
-    });
+    const howLongUnavailable = formatDistance(
+      baseDate,
+      baseDatePlusUnavailable,
+      {
+        locale: uk,
+        includeSeconds: false,
+      }
+    );
 
     const m = getMonth(params.dateFromTargetMonth);
     const mn =
@@ -513,6 +562,12 @@ export class NotificationBotService {
       return;
     }
 
+    if (place.isDisabled) {
+      await this.notifyBotDisabled({ chatId: msg.chat.id, telegramBot });
+
+      return;
+    }
+
     await this.userRepository.saveUserAction({
       placeId: place.id,
       chatId: msg.chat.id,
@@ -521,9 +576,13 @@ export class NotificationBotService {
 
     const listedBotsMessage = await this.composeListedBotsMessage();
 
-    await telegramBot.sendMessage(msg.chat.id, RESP_ABOUT({ listedBotsMessage }), {
-      parse_mode: 'HTML',
-    });
+    await telegramBot.sendMessage(
+      msg.chat.id,
+      RESP_ABOUT({ listedBotsMessage }),
+      {
+        parse_mode: 'HTML',
+      }
+    );
   }
 
   private async notifyAllPlaceSubscribersAboutElectricityAvailabilityChange(params: {
@@ -537,6 +596,10 @@ export class NotificationBotService {
         `Place ${placeId} not fount in memory cache - skipping subscriber notification`
       );
 
+      return;
+    }
+
+    if (place.isDisabled) {
       return;
     }
 
@@ -577,13 +640,15 @@ export class NotificationBotService {
       );
 
       if (latest.isAvailable) {
-        response = diffInMinutes <= MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES
-          ? RESP_ENABLED_SUSPICIOUS({ when, place: place.name })
-          : RESP_ENABLED_DETAILED({ when, howLong, place: place.name })
+        response =
+          diffInMinutes <= MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES
+            ? RESP_ENABLED_SUSPICIOUS({ when, place: place.name })
+            : RESP_ENABLED_DETAILED({ when, howLong, place: place.name });
       } else {
-        response = diffInMinutes <= MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES
-          ? RESP_DISABLED_SUSPICIOUS({ when, place: place.name })
-          : RESP_DISABLED_DETAILED({ when, howLong, place: place.name });
+        response =
+          diffInMinutes <= MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES
+            ? RESP_DISABLED_SUSPICIOUS({ when, place: place.name })
+            : RESP_DISABLED_DETAILED({ when, howLong, place: place.name });
       }
     }
 
@@ -597,8 +662,16 @@ export class NotificationBotService {
     readonly place: Place;
   }): Promise<void> {
     const { place } = params;
+
+    if (place.isDisabled) {
+      return;
+    }
+
     const dateFromPreviousMonth = addMonths(new Date(), -1);
-    const statsMessage = await this.composePlaceMonthStatsMessage({ place, dateFromTargetMonth: dateFromPreviousMonth });
+    const statsMessage = await this.composePlaceMonthStatsMessage({
+      place,
+      dateFromTargetMonth: dateFromPreviousMonth,
+    });
 
     if (!statsMessage) {
       this.logger.verbose(
@@ -657,15 +730,23 @@ export class NotificationBotService {
       } catch (e: any) {
         // Below error means that user blocked bot, so we should remove subscription
         // `{"code":"ETELEGRAM","message":"ETELEGRAM: 403 Forbidden: bot was blocked by the user"}`
-        if (e?.code === 'ETELEGRAM' && e?.message?.includes('403') && e.message?.includes('blocked by the user')) {
-          this.logger.verbose(`Failed to send notification to ${chatId} chat ID since it blocked the bot. Thus removing subscription: ${JSON.stringify(e)}`);
+        if (
+          e?.code === 'ETELEGRAM' &&
+          e?.message?.includes('403') &&
+          e.message?.includes('blocked by the user')
+        ) {
+          this.logger.verbose(
+            `Failed to send notification to ${chatId} chat ID since it blocked the bot. Thus removing subscription: ${JSON.stringify(
+              e
+            )}`
+          );
 
-            await this.userRepository.removeUserSubscription({
-              placeId: place.id,
-              chatId,
-            });
+          await this.userRepository.removeUserSubscription({
+            placeId: place.id,
+            chatId,
+          });
 
-            continue;
+          continue;
         }
 
         this.logger.error(
@@ -694,13 +775,15 @@ export class NotificationBotService {
     try {
       const places = await this.placeRepository.getAllPlaces();
 
-      this.places = places.reduce<Record<string, Place>>(
-        (res, place) => ({
-          ...res,
-          [place.id]: place,
-        }),
-        {}
-      );
+      this.places = places
+        .filter((place) => !place.isDisabled)
+        .reduce<Record<string, Place>>(
+          (res, place) => ({
+            ...res,
+            [place.id]: place,
+          }),
+          {}
+        );
 
       const placeBots = await this.placeRepository.getAllPlaceBots();
 
@@ -811,5 +894,14 @@ export class NotificationBotService {
     });
 
     return res + '\n';
+  }
+
+  private async notifyBotDisabled(params: {
+    readonly chatId: number;
+    readonly telegramBot: TelegramBot;
+  }): Promise<void> {
+    const { chatId, telegramBot } = params;
+
+    await telegramBot.sendMessage(chatId, MSG_DISABLED, { parse_mode: 'HTML' });
   }
 }

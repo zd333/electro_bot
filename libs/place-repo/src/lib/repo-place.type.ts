@@ -6,4 +6,5 @@ export interface RepoPlace {
   readonly check_type: 'ping' | 'http';
   readonly unavailability_treshold_minutes: number | null;
   readonly created_at: Date;
+  readonly is_disabled: boolean;
 }

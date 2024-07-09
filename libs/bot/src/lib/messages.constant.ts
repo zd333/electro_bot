@@ -123,3 +123,6 @@ export const RESP_PREVIOUS_MONTH_SUMMARY = (params: {
   `Посміхайся, радій життю та не забувай підтримувати Українську Армію${EMOJ_HEART}!\n\n` +
   `${EMOJ_KISS_HEART}${EMOJ_KISS_HEART}${EMOJ_KISS_HEART}\n` +
   `${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+
+  export const MSG_DISABLED = 'Бот відключено адміністратором, зверніться до власника бота.\n';
+
