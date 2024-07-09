@@ -41,16 +41,32 @@ export const RESP_CURRENTLY_AVAILABLE = (params: {
   readonly when: string;
   readonly howLong: string;
   readonly place: string;
+  readonly scheduleDisableMoment?: Date;
+  readonly schedulePossibleDisableMoment?: Date;
 }) =>
-  `${EMOJ_BULB} Наразі все добре - світло в ${params.place} є!\nВключення відбулося ${params.when}.\n` +
-  `Світло є вже ${params.howLong}.\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+  `${EMOJ_BULB} Наразі все добре - світло в ${params.place} є!\n`+
+  `Включення відбулося ${params.when}.\n` +
+  `Світло є вже ${params.howLong}.\n`+
+  EXPECTED_DISABLE_MOMENT({
+    scheduleDisableMoment: params.scheduleDisableMoment,
+    schedulePossibleDisableMoment: params.schedulePossibleDisableMoment,
+  }) +
+  `Слава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
 export const RESP_CURRENTLY_UNAVAILABLE = (params: {
   readonly when: string;
   readonly howLong: string;
   readonly place: string;
+  readonly scheduleEnableMoment?: Date;
+  readonly schedulePossibleEnableMoment?: Date;
 }) =>
-  `${EMOJ_MOON} Нажаль, наразі світла в ${params.place} нема.\nВимкнення відбулося ${params.when}.\n` +
-  `Світло відсутнє вже ${params.howLong}.\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
+  `${EMOJ_MOON} Нажаль, наразі світла в ${params.place} нема.\n`+
+  `Вимкнення відбулося ${params.when}.\n` +
+  `Світло відсутнє вже ${params.howLong}.\n`+
+  EXPECTED_ENABLE_MOMENT({
+    scheduleEnableMoment: params.scheduleEnableMoment,
+    schedulePossibleEnableMoment: params.schedulePossibleEnableMoment,
+  }) +
+  `\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 export const RESP_SUBSCRIPTION_CREATED = (params: { readonly place: string }) =>
   `Підписка створена - ти будеш отримувати повідомлення кожного разу після зміни ситуації зі світлом в ${params.place}.\n` +
   `Ти завжди можеш відписатися за допомогою команди /unsubscribe.`;
@@ -73,8 +89,15 @@ export const RESP_ABOUT = (params: { readonly listedBotsMessage: string }) =>
 export const RESP_ENABLED_SHORT = (params: {
   readonly when: string;
   readonly place: string;
+  readonly scheduleDisableMoment?: Date;
+  readonly schedulePossibleDisableMoment?: Date;
 }) =>
-  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${params.place} включили!\n\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${params.place} включили!\n` +
+  EXPECTED_DISABLE_MOMENT({
+    scheduleDisableMoment: params.scheduleDisableMoment,
+    schedulePossibleDisableMoment: params.schedulePossibleDisableMoment,
+  }) +
+  `\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
 export const RESP_DISABLED_SHORT = (params: {
   readonly when: string;
   readonly place: string;
@@ -91,8 +114,15 @@ export const RESP_ENABLED_DETAILED = (params: {
   readonly when: string;
   readonly howLong: string;
   readonly place: string;
+  readonly scheduleDisableMoment?: Date;
+  readonly schedulePossibleDisableMoment?: Date;
 }) =>
-  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${params.place} включили!\nСвітло було відсутнє ${params.howLong}.\n\n` +
+  `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${params.place} включили!\n` +
+  EXPECTED_DISABLE_MOMENT({
+    scheduleDisableMoment: params.scheduleDisableMoment,
+    schedulePossibleDisableMoment: params.schedulePossibleDisableMoment,
+  }) +
+  `Світло було відсутнє ${params.howLong}.\n\n` +
   `Слава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
 export const RESP_ENABLED_SUSPICIOUS = (params: {
   readonly when: string;
@@ -149,7 +179,7 @@ export const EXPECTED_ENABLE_MOMENT = (params: {
         'HH:mm'
       )}.\n`
     : !params.scheduleEnableMoment && params.schedulePossibleEnableMoment
-    ? `Якщо повезе, чікуємо на можливе включення о ${format(
+    ? `Очікуємо на можливе включення о ${format(
         params.schedulePossibleEnableMoment,
         'HH:mm'
       )}.\n`
@@ -157,8 +187,31 @@ export const EXPECTED_ENABLE_MOMENT = (params: {
     ? `Очікуємо на включення о ${format(
         params.scheduleEnableMoment,
         'HH:mm'
-      )}, а якщо повезе - то навіть о ${format(
+      )}, або навіть раніше - о ${format(
         params.schedulePossibleEnableMoment,
         'HH:mm'
+      )} (можливе включення).\n`
+    : '';
+export const EXPECTED_DISABLE_MOMENT = (params: {
+  readonly scheduleDisableMoment?: Date;
+  readonly schedulePossibleDisableMoment?: Date;
+}) =>
+  params.scheduleDisableMoment && !params.schedulePossibleDisableMoment
+    ? `Очікуємо на вимкнення о ${format(
+        params.scheduleDisableMoment,
+        'HH:mm'
       )}.\n`
+    : !params.scheduleDisableMoment && params.schedulePossibleDisableMoment
+    ? `Очікуємо на можливе вимкнення о ${format(
+        params.schedulePossibleDisableMoment,
+        'HH:mm'
+      )}.\n`
+    : params.scheduleDisableMoment && params.schedulePossibleDisableMoment
+    ? `Очікуємо на вимкнення о ${format(
+        params.scheduleDisableMoment,
+        'HH:mm'
+      )}, або навіть раніше - о ${format(
+        params.schedulePossibleDisableMoment,
+        'HH:mm'
+      )} (можливе вимкнення).\n`
     : '';

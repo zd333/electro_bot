@@ -183,9 +183,39 @@ export class NotificationBotService {
       locale: uk,
       includeSeconds: false,
     });
+
+    let scheduleEnableMoment: Date | undefined;
+    let schedulePossibleEnableMoment: Date | undefined;
+    let scheduleDisableMoment: Date | undefined;
+    let schedulePossibleDisableMoment: Date | undefined;
+
+    if (place.kyivScheduleGroupId === 0 || place.kyivScheduleGroupId) {
+      const scheduleData =
+        await this.kyivElectricstatusScheduleService.getNextScheduledMoments({
+          scheduleGroupId: place.kyivScheduleGroupId,
+        });
+
+      scheduleEnableMoment = scheduleData?.enableMoment;
+      schedulePossibleEnableMoment = scheduleData?.possibleEnableMoment;
+      scheduleDisableMoment = scheduleData?.disableMoment;
+      schedulePossibleDisableMoment = scheduleData?.possibleDisableMoment;
+    }
+
     const response = latest.isAvailable
-      ? RESP_CURRENTLY_AVAILABLE({ when, howLong, place: place.name })
-      : RESP_CURRENTLY_UNAVAILABLE({ when, howLong, place: place.name });
+      ? RESP_CURRENTLY_AVAILABLE({
+          when,
+          howLong,
+          place: place.name,
+          scheduleDisableMoment,
+          schedulePossibleDisableMoment,
+        })
+      : RESP_CURRENTLY_UNAVAILABLE({
+          when,
+          howLong,
+          place: place.name,
+          scheduleEnableMoment,
+          schedulePossibleEnableMoment,
+        });
 
     await telegramBot.sendMessage(msg.chat.id, response, {
       parse_mode: 'HTML',
@@ -610,17 +640,19 @@ export class NotificationBotService {
 
     let scheduleEnableMoment: Date | undefined;
     let schedulePossibleEnableMoment: Date | undefined;
+    let scheduleDisableMoment: Date | undefined;
+    let schedulePossibleDisableMoment: Date | undefined;
 
     if (place.kyivScheduleGroupId === 0 || place.kyivScheduleGroupId) {
       const scheduleData =
-        await this.kyivElectricstatusScheduleService.getScheduledEnableAvailabilityMoment(
-          {
-            scheduleGroupId: place.kyivScheduleGroupId,
-          }
-        );
+        await this.kyivElectricstatusScheduleService.getNextScheduledMoments({
+          scheduleGroupId: place.kyivScheduleGroupId,
+        });
 
       scheduleEnableMoment = scheduleData?.enableMoment;
       schedulePossibleEnableMoment = scheduleData?.possibleEnableMoment;
+      scheduleDisableMoment = scheduleData?.disableMoment;
+      schedulePossibleDisableMoment = scheduleData?.possibleDisableMoment;
     }
 
     const [latest, previous] =
@@ -645,7 +677,12 @@ export class NotificationBotService {
 
     if (!previous) {
       response = latest.isAvailable
-        ? RESP_ENABLED_SHORT({ when, place: place.name })
+        ? RESP_ENABLED_SHORT({
+            when,
+            place: place.name,
+            scheduleDisableMoment,
+            schedulePossibleDisableMoment,
+          })
         : RESP_DISABLED_SHORT({
             when,
             place: place.name,
@@ -668,7 +705,13 @@ export class NotificationBotService {
         response =
           diffInMinutes <= MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES
             ? RESP_ENABLED_SUSPICIOUS({ when, place: place.name })
-            : RESP_ENABLED_DETAILED({ when, howLong, place: place.name });
+            : RESP_ENABLED_DETAILED({
+                when,
+                howLong,
+                place: place.name,
+                scheduleDisableMoment,
+                schedulePossibleDisableMoment,
+              });
       } else {
         response =
           diffInMinutes <= MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES
