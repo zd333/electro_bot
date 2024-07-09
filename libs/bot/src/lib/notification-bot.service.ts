@@ -79,7 +79,7 @@ export class NotificationBotService {
 
     for (const place of allPlaces) {
       if (place.isDisabled) {
-        this.logger.log(`Skipping disabled place ${place.name}`);
+        this.logger.verbose(`Skipping disabled place ${place.name}`);
 
         continue;
       }
@@ -114,7 +114,7 @@ export class NotificationBotService {
       command: 'start',
     });
 
-    this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
+    this.logger.log(`Handling message: ${JSON.stringify(msg)}`);
 
     const listedBotsMessage = await this.composeListedBotsMessage();
 
@@ -151,7 +151,7 @@ export class NotificationBotService {
       command: 'current',
     });
 
-    this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
+    this.logger.log(`Handling message: ${JSON.stringify(msg)}`);
 
     const [latest] =
       await this.electricityAvailabilityService.getLatestPlaceAvailability({
@@ -213,7 +213,7 @@ export class NotificationBotService {
       command: 'subscribe',
     });
 
-    this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
+    this.logger.log(`Handling message: ${JSON.stringify(msg)}`);
 
     const added = await this.userRepository.addUserSubscription({
       placeId: place.id,
@@ -248,7 +248,7 @@ export class NotificationBotService {
       command: 'unsubscribe',
     });
 
-    this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
+    this.logger.log(`Handling message: ${JSON.stringify(msg)}`);
 
     const removed = await this.userRepository.removeUserSubscription({
       placeId: place.id,
@@ -290,7 +290,7 @@ export class NotificationBotService {
       command: 'stats',
     });
 
-    this.logger.verbose(`Handling message: ${JSON.stringify(msg)}`);
+    this.logger.log(`Handling message: ${JSON.stringify(msg)}`);
 
     const stats =
       await this.electricityAvailabilityService.getTodayAndYesterdayStats({
@@ -674,7 +674,7 @@ export class NotificationBotService {
     });
 
     if (!statsMessage) {
-      this.logger.verbose(
+      this.logger.log(
         `No monthly stats for ${place.name} - skipping subscriber notification`
       );
 
@@ -697,7 +697,7 @@ export class NotificationBotService {
     const botEntry = this.placeBots[place.id];
 
     if (!botEntry) {
-      this.logger.log(
+      this.logger.warn(
         `No bot for ${place.name} - no subscriber notification performed`
       );
 
@@ -716,7 +716,7 @@ export class NotificationBotService {
       placeId: place.id,
     });
 
-    this.logger.verbose(
+    this.logger.log(
       `Notifying all ${subscribers.length} subscribers of ${place.name}`
     );
 
@@ -735,7 +735,7 @@ export class NotificationBotService {
           e?.message?.includes('403') &&
           e.message?.includes('blocked by the user')
         ) {
-          this.logger.verbose(
+          this.logger.log(
             `Failed to send notification to ${chatId} chat ID since it blocked the bot. Thus removing subscription: ${JSON.stringify(
               e
             )}`
@@ -757,7 +757,7 @@ export class NotificationBotService {
       }
     }
 
-    this.logger.verbose(
+    this.logger.log(
       `Finished notifying all ${subscribers.length} subscribers of ${place.name}`
     );
   }

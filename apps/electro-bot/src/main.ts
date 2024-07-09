@@ -5,8 +5,15 @@
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
+import { LogLevel } from '@nestjs/common';
 
 async function bootstrap() {
-  await NestFactory.createApplicationContext(AppModule);
+  const logLevel = (process.env.LOG_LEVEL || 'error')
+    .split(',')
+    .map((level: LogLevel[number]) => level.trim()) as Array<LogLevel>;
+
+  await NestFactory.createApplicationContext(AppModule, {
+    logger: logLevel,
+  });
 }
 bootstrap();

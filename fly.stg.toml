@@ -7,6 +7,7 @@ processes = []
 
 [env]
   NODE_ENV = "production"
+  LOG_LEVEL = "log,error,warn,debug,verbose"
   DB_HOST = "top2.nearest.of.pg-electro-bot-stg.internal"
   DB_NAME = "electrobotstg"
   DB_USER = "electrobotstg"
