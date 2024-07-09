@@ -40,6 +40,7 @@ import {
 } from './messages.constant';
 
 const MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES = 30;
+const BULK_NOTIFICATION_DELAY_IN_MS = 50;
 
 @Injectable()
 export class NotificationBotService {
@@ -723,39 +724,41 @@ export class NotificationBotService {
     for (const subscriber of subscribers) {
       const { chatId } = subscriber;
 
-      try {
-        await botEntry.telegramBot.sendMessage(chatId, msg, {
+      await this.sleep({ ms: BULK_NOTIFICATION_DELAY_IN_MS });
+
+      botEntry.telegramBot
+        .sendMessage(chatId, msg, {
           parse_mode: 'HTML',
-        });
-      } catch (e: any) {
-        // Below error means that user blocked bot, so we should remove subscription
-        // `{"code":"ETELEGRAM","message":"ETELEGRAM: 403 Forbidden: bot was blocked by the user"}`
-        if (
-          e?.code === 'ETELEGRAM' &&
-          e?.message?.includes('403') &&
-          (e.message?.includes('blocked by the user') ||
-            e.message?.includes('user is deactivated'))
-        ) {
-          this.logger.log(
-            `Failed to send notification to ${chatId} chat ID since it blocked the bot. Thus removing subscription: ${JSON.stringify(
+        })
+        .catch((e: any) => {
+          // Below error means that user blocked bot, so we should remove subscription
+          // `{"code":"ETELEGRAM","message":"ETELEGRAM: 403 Forbidden: bot was blocked by the user"}`
+          if (
+            e?.code === 'ETELEGRAM' &&
+            e?.message?.includes('403') &&
+            (e.message?.includes('blocked by the user') ||
+              e.message?.includes('user is deactivated'))
+          ) {
+            this.logger.log(
+              `Failed to send notification to ${chatId} chat ID since it blocked the bot. Thus removing subscription: ${JSON.stringify(
+                e
+              )}`
+            );
+
+            this.userRepository.removeUserSubscription({
+              placeId: place.id,
+              chatId,
+            });
+
+            return;
+          }
+
+          this.logger.error(
+            `Failed to send notification to ${chatId} chat ID: ${JSON.stringify(
               e
             )}`
           );
-
-          await this.userRepository.removeUserSubscription({
-            placeId: place.id,
-            chatId,
-          });
-
-          continue;
-        }
-
-        this.logger.error(
-          `Failed to send notification to ${chatId} chat ID: ${JSON.stringify(
-            e
-          )}`
-        );
-      }
+        });
     }
 
     this.logger.log(
@@ -902,5 +905,9 @@ export class NotificationBotService {
     const { chatId, telegramBot } = params;
 
     await telegramBot.sendMessage(chatId, MSG_DISABLED, { parse_mode: 'HTML' });
+  }
+
+  private async sleep(params: { readonly ms: number }): Promise<void> {
+    return new Promise((r) => setTimeout(r, params.ms));
   }
 }
