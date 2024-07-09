@@ -733,7 +733,8 @@ export class NotificationBotService {
         if (
           e?.code === 'ETELEGRAM' &&
           e?.message?.includes('403') &&
-          e.message?.includes('blocked by the user')
+          (e.message?.includes('blocked by the user') ||
+            e.message?.includes('user is deactivated'))
         ) {
           this.logger.log(
             `Failed to send notification to ${chatId} chat ID since it blocked the bot. Thus removing subscription: ${JSON.stringify(
@@ -775,14 +776,13 @@ export class NotificationBotService {
     try {
       const places = await this.placeRepository.getAllPlaces();
 
-      this.places = places
-        .reduce<Record<string, Place>>(
-          (res, place) => ({
-            ...res,
-            [place.id]: place,
-          }),
-          {}
-        );
+      this.places = places.reduce<Record<string, Place>>(
+        (res, place) => ({
+          ...res,
+          [place.id]: place,
+        }),
+        {}
+      );
 
       const placeBots = await this.placeRepository.getAllPlaceBots();
 
