@@ -16,6 +16,8 @@ import { Place } from '@electrobot/domain';
 import { PlaceRepository } from '@electrobot/place-repo';
 
 const DEFAULT_TRESHOLD_MINUTES = 7;
+const HTTP_CHECK_TIMEOUT_SECONDS = 1;
+const TIME_TO_WAIT_BEFORE_NEXT_ATTEMPT_TO_CHECK_AVAILABILITY_AFTER_FAILED_ONE_SECONDS = 10;
 
 @Injectable()
 export class ElectricityAvailabilityService {
@@ -36,9 +38,11 @@ export class ElectricityAvailabilityService {
 
   public async checkAndSaveElectricityAvailabilityStateOfAllPlaces(): Promise<void> {
     const places = await this.placeRepository.getAllPlaces();
-    const jobs = places.map((place) =>
-      this.checkAndSavePlaceElectricityAvailability({ place })
-    );
+    const jobs = places
+      .filter((place) => !place.isDisabled)
+      .map((place) =>
+        this.checkAndSavePlaceElectricityAvailability({ place })
+      );
 
     await Promise.all(jobs);
   }
@@ -255,7 +259,7 @@ export class ElectricityAvailabilityService {
       } else if (place.checkType === 'http') {
         try {
           const httpRes = await firstValueFrom(this.httpService.get(params.place.host, {
-            timeout: 1000,
+            timeout: 1000 * HTTP_CHECK_TIMEOUT_SECONDS,
           }));
 
           this.logger.verbose(`HTTP ${params.place.host} successful check result for ${place.name}: ${httpRes.status} status code`);
@@ -275,7 +279,7 @@ export class ElectricityAvailabilityService {
       }
 
       if (!alive) {
-        await this.sleep({ ms: 1 * 1000 }); // 1s
+        await this.sleep({ ms: 1 * TIME_TO_WAIT_BEFORE_NEXT_ATTEMPT_TO_CHECK_AVAILABILITY_AFTER_FAILED_ONE_SECONDS }); // 1s
       }
 
       currentTime = Date.now();

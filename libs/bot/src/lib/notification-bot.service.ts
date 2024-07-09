@@ -776,7 +776,6 @@ export class NotificationBotService {
       const places = await this.placeRepository.getAllPlaces();
 
       this.places = places
-        .filter((place) => !place.isDisabled)
         .reduce<Record<string, Place>>(
           (res, place) => ({
             ...res,
