@@ -12,7 +12,8 @@ export class CronService {
     private readonly notificationBotService: NotificationBotService,
   ) {}
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  // Every 2 minutes
+  @Cron('0 */2 * * * *')
   public async checkElectricityAvailability(): Promise<void> {
     await this.electricityAvailabilityService.checkAndSaveElectricityAvailabilityStateOfAllPlaces();
   }
