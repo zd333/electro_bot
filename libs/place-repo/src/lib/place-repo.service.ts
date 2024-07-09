@@ -13,36 +13,60 @@ export class PlaceRepository {
       .select<Array<RepoPlace>>('*')
       .from('place');
 
-    return queryRes.map(({ id, name, timezone, host, check_type, unavailability_treshold_minutes, is_disabled }) => ({
-      id,
-      name,
-      timezone,
-      host,
-      checkType: check_type,
-      unavailabilityTresholdMinutes: unavailability_treshold_minutes ?? undefined,
-      isDisabled: is_disabled,
-    }));
+    return queryRes.map(
+      ({
+        id,
+        name,
+        timezone,
+        host,
+        check_type,
+        unavailability_treshold_minutes,
+        kyiv_schedule_group_id,
+        is_disabled,
+      }) => ({
+        id,
+        name,
+        timezone,
+        host,
+        checkType: check_type,
+        unavailabilityTresholdMinutes:
+          unavailability_treshold_minutes ?? undefined,
+        kyivScheduleGroupId: kyiv_schedule_group_id ?? undefined,
+        isDisabled: is_disabled,
+      })
+    );
   }
 
   public async getAllPlaceBots(): Promise<Array<Bot>> {
     const queryRes = await this.knex.select<Array<RepoBot>>('*').from('bot');
 
-    return queryRes.map(({ id, bot_name, place_id, token, is_enabled, is_publically_listed }) => ({
-      id,
-      botName: bot_name ?? undefined,
-      token,
-      placeId: place_id,
-      isEnabled: is_enabled,
-      isPublicallyListed: is_publically_listed ?? undefined,
-    }));
+    return queryRes.map(
+      ({
+        id,
+        bot_name,
+        place_id,
+        token,
+        is_enabled,
+        is_publically_listed,
+      }) => ({
+        id,
+        botName: bot_name ?? undefined,
+        token,
+        placeId: place_id,
+        isEnabled: is_enabled,
+        isPublicallyListed: is_publically_listed ?? undefined,
+      })
+    );
   }
 
   public async getListedPlaceBotStats(): Promise<Array<BotStats>> {
     return await this.knex
       .select<Array<BotStats>>(
-        this.knex.raw('count(DISTINCT "user_action"."chat_id") as "numberOfUsers"'),
+        this.knex.raw(
+          'count(DISTINCT "user_action"."chat_id") as "numberOfUsers"'
+        ),
         this.knex.raw('MIN("place"."name") as "placeName"'),
-        this.knex.raw('MIN("bot"."bot_name") as "botName"'),
+        this.knex.raw('MIN("bot"."bot_name") as "botName"')
       )
       .from('user_action')
       .innerJoin('place', 'place.id', '=', 'user_action.place_id')

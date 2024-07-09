@@ -1,4 +1,7 @@
-import { ElectricityAvailabilityService } from '@electrobot/electricity-availability';
+import {
+  ElectricityAvailabilityService,
+  KyivElectricstatusScheduleService,
+} from '@electrobot/electricity-availability';
 import { UserRepository } from '@electrobot/user-repo';
 import { Injectable, Logger } from '@nestjs/common';
 import {
@@ -57,6 +60,7 @@ export class NotificationBotService {
 
   constructor(
     private readonly electricityAvailabilityService: ElectricityAvailabilityService,
+    private readonly kyivElectricstatusScheduleService: KyivElectricstatusScheduleService,
     private readonly userRepository: UserRepository,
     private readonly placeRepository: PlaceRepository
   ) {
@@ -604,6 +608,21 @@ export class NotificationBotService {
       return;
     }
 
+    let scheduleEnableMoment: Date | undefined;
+    let schedulePossibleEnableMoment: Date | undefined;
+
+    if (place.kyivScheduleGroupId === 0 || place.kyivScheduleGroupId) {
+      const scheduleData =
+        await this.kyivElectricstatusScheduleService.getScheduledEnableAvailabilityMoment(
+          {
+            scheduleGroupId: place.kyivScheduleGroupId,
+          }
+        );
+
+      scheduleEnableMoment = scheduleData?.enableMoment;
+      schedulePossibleEnableMoment = scheduleData?.possibleEnableMoment;
+    }
+
     const [latest, previous] =
       await this.electricityAvailabilityService.getLatestPlaceAvailability({
         placeId,
@@ -627,7 +646,12 @@ export class NotificationBotService {
     if (!previous) {
       response = latest.isAvailable
         ? RESP_ENABLED_SHORT({ when, place: place.name })
-        : RESP_DISABLED_SHORT({ when, place: place.name });
+        : RESP_DISABLED_SHORT({
+            when,
+            place: place.name,
+            scheduleEnableMoment,
+            schedulePossibleEnableMoment,
+          });
     } else {
       const previousTime = convertToTimeZone(previous.time, {
         timeZone: place.timezone,
@@ -649,7 +673,13 @@ export class NotificationBotService {
         response =
           diffInMinutes <= MIN_SUSPICIOUS_DISABLE_TIME_IN_MINUTES
             ? RESP_DISABLED_SUSPICIOUS({ when, place: place.name })
-            : RESP_DISABLED_DETAILED({ when, howLong, place: place.name });
+            : RESP_DISABLED_DETAILED({
+                when,
+                howLong,
+                place: place.name,
+                scheduleEnableMoment,
+                schedulePossibleEnableMoment,
+              });
       }
     }
 

@@ -1,5 +1,6 @@
 import * as Emoji from 'node-emoji';
 import { VERSION } from '@electrobot/domain';
+import { format } from 'date-fns';
 
 export const EMOJ_UA = Emoji.get(Emoji.emoji['flag-ua']);
 export const EMOJ_PERSERVE = Emoji.get(Emoji.emoji['persevere']);
@@ -77,8 +78,15 @@ export const RESP_ENABLED_SHORT = (params: {
 export const RESP_DISABLED_SHORT = (params: {
   readonly when: string;
   readonly place: string;
+  readonly scheduleEnableMoment?: Date;
+  readonly schedulePossibleEnableMoment?: Date;
 }) =>
-  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params} вимкнено!\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
+  `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params} вимкнено!\n` +
+  EXPECTED_ENABLE_MOMENT({
+    scheduleEnableMoment: params.scheduleEnableMoment,
+    schedulePossibleEnableMoment: params.schedulePossibleEnableMoment,
+  }) +
+  `\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 export const RESP_ENABLED_DETAILED = (params: {
   readonly when: string;
   readonly howLong: string;
@@ -87,17 +95,23 @@ export const RESP_ENABLED_DETAILED = (params: {
   `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${params.place} включили!\nСвітло було відсутнє ${params.howLong}.\n\n` +
   `Слава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
 export const RESP_ENABLED_SUSPICIOUS = (params: {
-    readonly when: string;
-    readonly place: string;
-  }) =>
-    `${EMOJ_BULB} ${params.when}\nСхоже, що, світло в ${params.place} включили!\n` +
-    `Хоча можливо його і не виключали, а це насправді була проблема з Інтернетом ${EMOJ_PERSERVE}.`;
+  readonly when: string;
+  readonly place: string;
+}) =>
+  `${EMOJ_BULB} ${params.when}\nСхоже, що, світло в ${params.place} включили!\n` +
+  `Хоча можливо його і не виключали, а це насправді була проблема з Інтернетом ${EMOJ_PERSERVE}.`;
 export const RESP_DISABLED_DETAILED = (params: {
   readonly when: string;
   readonly howLong: string;
   readonly place: string;
+  readonly scheduleEnableMoment?: Date;
+  readonly schedulePossibleEnableMoment?: Date;
 }) =>
   `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params.place} вимкнено!\n` +
+  EXPECTED_ENABLE_MOMENT({
+    scheduleEnableMoment: params.scheduleEnableMoment,
+    schedulePossibleEnableMoment: params.schedulePossibleEnableMoment,
+  }) +
   `Ми насолоджувалися світлом ${params.howLong}.\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 export const RESP_DISABLED_SUSPICIOUS = (params: {
   readonly when: string;
@@ -123,6 +137,28 @@ export const RESP_PREVIOUS_MONTH_SUMMARY = (params: {
   `Посміхайся, радій життю та не забувай підтримувати Українську Армію${EMOJ_HEART}!\n\n` +
   `${EMOJ_KISS_HEART}${EMOJ_KISS_HEART}${EMOJ_KISS_HEART}\n` +
   `${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
-
-  export const MSG_DISABLED = 'Бот відключено адміністратором, зверніться до власника бота.\n';
-
+export const MSG_DISABLED =
+  'Бот відключено адміністратором, зверніться до власника бота.\n';
+export const EXPECTED_ENABLE_MOMENT = (params: {
+  readonly scheduleEnableMoment?: Date;
+  readonly schedulePossibleEnableMoment?: Date;
+}) =>
+  params.scheduleEnableMoment && !params.schedulePossibleEnableMoment
+    ? `Очікуємо на включення о ${format(
+        params.scheduleEnableMoment,
+        'HH:mm'
+      )}.\n`
+    : !params.scheduleEnableMoment && params.schedulePossibleEnableMoment
+    ? `Якщо повезе, чікуємо на можливе включення о ${format(
+        params.schedulePossibleEnableMoment,
+        'HH:mm'
+      )}.\n`
+    : params.scheduleEnableMoment && params.schedulePossibleEnableMoment
+    ? `Очікуємо на включення о ${format(
+        params.scheduleEnableMoment,
+        'HH:mm'
+      )}, а якщо повезе - то навіть о ${format(
+        params.schedulePossibleEnableMoment,
+        'HH:mm'
+      )}.\n`
+    : '';
