@@ -20,7 +20,7 @@
     "date-fns-timezone": "^0.1.4",
     "knex": "^2.3.0",
     "nestjs-knex": "^2.0.0",
-    "node-emoji": "^1.11.0",
+    "node-emoji": "^2.1.3",
     "node-telegram-bot-api": "^0.60.0",
     "pg": "^8.8.0",
     "ping": "^0.4.2",

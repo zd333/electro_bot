@@ -1,17 +1,20 @@
-import * as Emoji from 'node-emoji';
+import * as emoji from 'node-emoji';
 import { VERSION } from '@electrobot/domain';
 import { format } from 'date-fns';
 
-export const EMOJ_UA = Emoji.get(Emoji.emoji['flag-ua']);
-export const EMOJ_PERSERVE = Emoji.get(Emoji.emoji['persevere']);
-export const EMOJ_BULB = Emoji.get(Emoji.emoji['bulb']);
-export const EMOJ_MOON = Emoji.get(Emoji.emoji['new_moon_with_face']);
-export const EMOJ_HALF_MOON = Emoji.get(Emoji.emoji['waning_crescent_moon']);
-export const EMOJ_KISS = Emoji.get(Emoji.emoji['kiss']);
-export const EMOJ_KISS_HEART = Emoji.get(Emoji.emoji['kissing_heart']);
-export const EMOJ_HEART = Emoji.get(Emoji.emoji['heart']);
-export const EMOJ_SMILING_IMP = Emoji.get(Emoji.emoji['smiling_imp']);
-export const EMOJ_POOP = Emoji.get(Emoji.emoji['poop']);
+export const EMOJ_UA = emoji.get('flag-ua');
+export const EMOJ_PERSERVE = emoji.get('persevere');
+export const EMOJ_BULB = emoji.get('bulb');
+export const EMOJ_MOON = emoji.get('new_moon_with_face');
+export const EMOJ_HALF_MOON = emoji.get('waning_crescent_moon');
+export const EMOJ_KISS = emoji.get('kiss');
+export const EMOJ_KISS_HEART = emoji.get('kissing_heart');
+export const EMOJ_HEART = emoji.get('heart');
+export const EMOJ_SLOT_MACHINE = emoji.get('slot_machine');
+export const EMOJ_CRYSTAL_BALL = emoji.get('crystal_ball');
+export const EMOJ_GAME_DIE = emoji.get('game_die');
+export const EMOJ_CROSSED_FINGERS = emoji.get('crossed_fingers');
+export const EMOJ_SYMBOLS_OVER_MOUTH = emoji.get('symbols_over_mouth');
 
 export const MSG_DISABLED_REGULAR_SUFFIX =
   'Не забувай підтримувати українську армію!\n' +
@@ -44,14 +47,14 @@ export const RESP_CURRENTLY_AVAILABLE = (params: {
   readonly scheduleDisableMoment?: Date;
   readonly schedulePossibleDisableMoment?: Date;
 }) =>
-  `${EMOJ_BULB} Наразі все добре - світло в ${params.place} є!\n`+
+  `${EMOJ_BULB} Наразі все добре - світло в ${params.place} є!\n\n`+
   `Включення відбулося ${params.when}.\n` +
   `Світло є вже ${params.howLong}.\n`+
   EXPECTED_DISABLE_MOMENT({
     scheduleDisableMoment: params.scheduleDisableMoment,
     schedulePossibleDisableMoment: params.schedulePossibleDisableMoment,
   }) +
-  `Слава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+  `\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
 export const RESP_CURRENTLY_UNAVAILABLE = (params: {
   readonly when: string;
   readonly howLong: string;
@@ -59,7 +62,7 @@ export const RESP_CURRENTLY_UNAVAILABLE = (params: {
   readonly scheduleEnableMoment?: Date;
   readonly schedulePossibleEnableMoment?: Date;
 }) =>
-  `${EMOJ_MOON} Нажаль, наразі світла в ${params.place} нема.\n`+
+  `${EMOJ_MOON} Нажаль, наразі світла в ${params.place} нема.\n\n`+
   `Вимкнення відбулося ${params.when}.\n` +
   `Світло відсутнє вже ${params.howLong}.\n`+
   EXPECTED_ENABLE_MOMENT({
@@ -118,12 +121,12 @@ export const RESP_ENABLED_DETAILED = (params: {
   readonly schedulePossibleDisableMoment?: Date;
 }) =>
   `${EMOJ_BULB} ${params.when}\nЮхууу, світло в ${params.place} включили!\n` +
+  `Світло було відсутнє ${params.howLong}.\n` +
   EXPECTED_DISABLE_MOMENT({
     scheduleDisableMoment: params.scheduleDisableMoment,
     schedulePossibleDisableMoment: params.schedulePossibleDisableMoment,
   }) +
-  `Світло було відсутнє ${params.howLong}.\n\n` +
-  `Слава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
+  `\nСлава Україні! ${EMOJ_UA}${EMOJ_UA}${EMOJ_UA}`;
 export const RESP_ENABLED_SUSPICIOUS = (params: {
   readonly when: string;
   readonly place: string;
@@ -138,11 +141,12 @@ export const RESP_DISABLED_DETAILED = (params: {
   readonly schedulePossibleEnableMoment?: Date;
 }) =>
   `${EMOJ_MOON} ${params.when}\nЙой, світло в ${params.place} вимкнено!\n` +
+  `Ми насолоджувалися світлом ${params.howLong}.\n`+
   EXPECTED_ENABLE_MOMENT({
     scheduleEnableMoment: params.scheduleEnableMoment,
     schedulePossibleEnableMoment: params.schedulePossibleEnableMoment,
   }) +
-  `Ми насолоджувалися світлом ${params.howLong}.\n\n${MSG_DISABLED_REGULAR_SUFFIX}`;
+  `\n${MSG_DISABLED_REGULAR_SUFFIX}`;
 export const RESP_DISABLED_SUSPICIOUS = (params: {
   readonly when: string;
   readonly place: string;
@@ -153,16 +157,9 @@ export const RESP_PREVIOUS_MONTH_SUMMARY = (params: {
   readonly statsMessage: string;
 }) =>
   `${EMOJ_HALF_MOON}Привіт, на зв‘язку світлобот!\n\n` +
-  // TODO: rephrase so that it works not only for the first month
   `Ось і закінчився черговий місяць, в якому електрика і світло мають для нас особливе значення.\n\n` +
   params.statsMessage +
   '\n\n' +
-  'Декілька цікавих фактів минулого місяця:\n' +
-  // TODO: move this to DB so that no need to deploy to change content
-  `${EMOJ_HEART} Важка атлетика - королева спорту\n` +
-  `${EMOJ_SMILING_IMP} Всі мотоциклісти - гімнюки\n` +
-  `${EMOJ_POOP} тищенко - Пі#ор!\n` +
-  '\n' +
   `Не сумуй, що час пролетів так швидко, адже тепер ми на місяць ближче до Перемоги!\n\n` +
   `Посміхайся, радій життю та не забувай підтримувати Українську Армію${EMOJ_HEART}!\n\n` +
   `${EMOJ_KISS_HEART}${EMOJ_KISS_HEART}${EMOJ_KISS_HEART}\n` +
@@ -174,44 +171,44 @@ export const EXPECTED_ENABLE_MOMENT = (params: {
   readonly schedulePossibleEnableMoment?: Date;
 }) =>
   params.scheduleEnableMoment && !params.schedulePossibleEnableMoment
-    ? `Очікуємо на включення о ${format(
+    ? `\n${EMOJ_SLOT_MACHINE}${EMOJ_CRYSTAL_BALL}${EMOJ_GAME_DIE} Згідно графіка Yasno очікуємо на включення о ${format(
         params.scheduleEnableMoment,
         'HH:mm'
       )}.\n`
     : !params.scheduleEnableMoment && params.schedulePossibleEnableMoment
-    ? `Очікуємо на можливе включення о ${format(
+    ? `\n${EMOJ_SLOT_MACHINE}${EMOJ_CRYSTAL_BALL}${EMOJ_GAME_DIE} Згідно графіка Yasno очікуємо на можливе включення о ${format(
         params.schedulePossibleEnableMoment,
         'HH:mm'
-      )}.\n`
+      )} (сіра зона).\n`
     : params.scheduleEnableMoment && params.schedulePossibleEnableMoment
-    ? `Очікуємо на включення о ${format(
+    ? `\n${EMOJ_SLOT_MACHINE}${EMOJ_CRYSTAL_BALL}${EMOJ_GAME_DIE} Згідно графіка Yasno очікуємо на включення о ${format(
         params.scheduleEnableMoment,
         'HH:mm'
-      )}, або навіть раніше - о ${format(
+      )}, ${EMOJ_CROSSED_FINGERS}або навіть раніше - о ${format(
         params.schedulePossibleEnableMoment,
         'HH:mm'
-      )} (можливе включення).\n`
+      )} (сіра зона).\n`
     : '';
 export const EXPECTED_DISABLE_MOMENT = (params: {
   readonly scheduleDisableMoment?: Date;
   readonly schedulePossibleDisableMoment?: Date;
 }) =>
   params.scheduleDisableMoment && !params.schedulePossibleDisableMoment
-    ? `Очікуємо на вимкнення о ${format(
+    ? `\n${EMOJ_SLOT_MACHINE}${EMOJ_CRYSTAL_BALL}${EMOJ_GAME_DIE} Згідно графіка Yasno очікуємо на вимкнення о ${format(
         params.scheduleDisableMoment,
         'HH:mm'
       )}.\n`
     : !params.scheduleDisableMoment && params.schedulePossibleDisableMoment
-    ? `Очікуємо на можливе вимкнення о ${format(
+    ? `\n${EMOJ_SLOT_MACHINE}${EMOJ_CRYSTAL_BALL}${EMOJ_GAME_DIE} Згідно графіка Yasno очікуємо на можливе вимкнення о ${format(
         params.schedulePossibleDisableMoment,
         'HH:mm'
-      )}.\n`
+      )} (сіра зона).\n`
     : params.scheduleDisableMoment && params.schedulePossibleDisableMoment
-    ? `Очікуємо на вимкнення о ${format(
+    ? `\n${EMOJ_SLOT_MACHINE}${EMOJ_CRYSTAL_BALL}${EMOJ_GAME_DIE} Згідно графіка Yasno очікуємо на вимкнення о ${format(
         params.scheduleDisableMoment,
         'HH:mm'
-      )}, або навіть раніше - о ${format(
+      )}, ${EMOJ_SYMBOLS_OVER_MOUTH}або навіть раніше - о ${format(
         params.schedulePossibleDisableMoment,
         'HH:mm'
-      )} (можливе вимкнення).\n`
+      )} (сіра зона).\n`
     : '';

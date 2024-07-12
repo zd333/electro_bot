@@ -190,15 +190,23 @@ export class NotificationBotService {
     let schedulePossibleDisableMoment: Date | undefined;
 
     if (place.kyivScheduleGroupId === 0 || place.kyivScheduleGroupId) {
-      const scheduleData =
-        await this.kyivElectricstatusScheduleService.getNextScheduledMoments({
-          scheduleGroupId: place.kyivScheduleGroupId,
-        });
+      if (latest.isAvailable) {
+        const scheduleData =
+          await this.kyivElectricstatusScheduleService.getNextDisableMoment({
+            scheduleGroupId: place.kyivScheduleGroupId,
+          });
 
-      scheduleEnableMoment = scheduleData?.enableMoment;
-      schedulePossibleEnableMoment = scheduleData?.possibleEnableMoment;
-      scheduleDisableMoment = scheduleData?.disableMoment;
-      schedulePossibleDisableMoment = scheduleData?.possibleDisableMoment;
+        scheduleDisableMoment = scheduleData?.disableMoment;
+        schedulePossibleDisableMoment = scheduleData?.possibleDisableMoment;
+      } else {
+        const scheduleData =
+          await this.kyivElectricstatusScheduleService.getNextEnableMoment({
+            scheduleGroupId: place.kyivScheduleGroupId,
+          });
+
+        scheduleEnableMoment = scheduleData?.enableMoment;
+        schedulePossibleEnableMoment = scheduleData?.possibleEnableMoment;
+      }
     }
 
     const response = latest.isAvailable
@@ -638,23 +646,6 @@ export class NotificationBotService {
       return;
     }
 
-    let scheduleEnableMoment: Date | undefined;
-    let schedulePossibleEnableMoment: Date | undefined;
-    let scheduleDisableMoment: Date | undefined;
-    let schedulePossibleDisableMoment: Date | undefined;
-
-    if (place.kyivScheduleGroupId === 0 || place.kyivScheduleGroupId) {
-      const scheduleData =
-        await this.kyivElectricstatusScheduleService.getNextScheduledMoments({
-          scheduleGroupId: place.kyivScheduleGroupId,
-        });
-
-      scheduleEnableMoment = scheduleData?.enableMoment;
-      schedulePossibleEnableMoment = scheduleData?.possibleEnableMoment;
-      scheduleDisableMoment = scheduleData?.disableMoment;
-      schedulePossibleDisableMoment = scheduleData?.possibleDisableMoment;
-    }
-
     const [latest, previous] =
       await this.electricityAvailabilityService.getLatestPlaceAvailability({
         placeId,
@@ -667,6 +658,31 @@ export class NotificationBotService {
       );
 
       return;
+    }
+
+    let scheduleEnableMoment: Date | undefined;
+    let schedulePossibleEnableMoment: Date | undefined;
+    let scheduleDisableMoment: Date | undefined;
+    let schedulePossibleDisableMoment: Date | undefined;
+
+    if (place.kyivScheduleGroupId === 0 || place.kyivScheduleGroupId) {
+      if (latest.isAvailable) {
+        const scheduleData =
+          await this.kyivElectricstatusScheduleService.getNextDisableMoment({
+            scheduleGroupId: place.kyivScheduleGroupId,
+          });
+
+        scheduleDisableMoment = scheduleData?.disableMoment;
+        schedulePossibleDisableMoment = scheduleData?.possibleDisableMoment;
+      } else {
+        const scheduleData =
+          await this.kyivElectricstatusScheduleService.getNextEnableMoment({
+            scheduleGroupId: place.kyivScheduleGroupId,
+          });
+
+        scheduleEnableMoment = scheduleData?.enableMoment;
+        schedulePossibleEnableMoment = scheduleData?.possibleEnableMoment;
+      }
     }
 
     const latestTime = convertToTimeZone(latest.time, {

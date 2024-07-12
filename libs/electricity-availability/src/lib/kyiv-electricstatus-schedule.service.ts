@@ -1,17 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import {
-  addDays,
-  format,
-  parse,
-  differenceInHours,
-  differenceInMinutes,
-} from 'date-fns';
+import { addDays, differenceInHours, addMinutes, parse } from 'date-fns';
 
 const ALL_GROUPS = [1, 2, 3, 4, 5, 6];
 const DELAY_BETWEEN_REQUESTS_MS = 100;
-const NEXT_AVAILABILITY_CHANGE_MIN_DIFFERENCE_MINUTES = 29;
+const SCHEDULE_INACCURACY_MINUTES = 29;
 const CACHE_REFRESH_MS = 1000 * 60 * 10; // 10 minutes
 const CACHE_EXPIRATION_HOURS = 4;
 
@@ -39,112 +33,187 @@ export class KyivElectricstatusScheduleService {
     setInterval(() => this.refreshCache(), CACHE_REFRESH_MS);
   }
 
-  public async getNextScheduledMoments(params: {
+  /**
+   * This assumes no power now.
+   */
+  public async getNextEnableMoment(params: {
     readonly scheduleGroupId: number;
   }): Promise<{
     readonly enableMoment?: Date;
     readonly possibleEnableMoment?: Date;
-    readonly disableMoment?: Date;
-    readonly possibleDisableMoment?: Date;
   }> {
-    const data = this.cache[params.scheduleGroupId]?.response;
+    const { scheduleGroupId } = params;
+    const data = this.cache[scheduleGroupId]?.response;
 
     if (!data) {
       this.logger.warn(
-        `No schedule data found in the cache for group ${params.scheduleGroupId}`
+        `No schedule data found in the cache for group ${scheduleGroupId}`
       );
 
       return {};
     }
 
-    const now = new Date();
-    const todayDayOfWeek = format(
-      now,
-      'EEEE'
-    ).toLowerCase() as keyof ScheduleResponse;
-    const tomorrowDayOfWeek = format(
-      addDays(now, 1),
-      'EEEE'
-    ).toLowerCase() as keyof ScheduleResponse;
-    const todayData = data[todayDayOfWeek];
-    const tomorrowData = data[tomorrowDayOfWeek];
+    const nowOnServer = new Date();
+    const tomorrowOnServer = addDays(nowOnServer, 1);
+    const kyivHours = nowOnServer.toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false });
+    const now = this.scheduleMomentToDate({ moment: kyivHours, baseDate: nowOnServer });
+    const tomorrow = addDays(now, 1);
+    const severalMinutesAgo = addMinutes(now, -SCHEDULE_INACCURACY_MINUTES);
+    const todayDayOfWeekInKyiv = this.weekDayInKyiv(nowOnServer);
+    const tomorrowDayOfWeekInKyiv = this.weekDayInKyiv(tomorrowOnServer);
+    const todayData = data[todayDayOfWeekInKyiv];
+    const tomorrowData = data[tomorrowDayOfWeekInKyiv];
 
-    let nextEnableMoment: Date | undefined = todayData.power_on
-      .map(({ time: { start} }) => parse(start, 'HH:mm', now))
-      .find(
-        (date) =>
-          differenceInMinutes(date, now) >
-          NEXT_AVAILABILITY_CHANGE_MIN_DIFFERENCE_MINUTES
-      );
+    this.logger.verbose(
+      `getNextEnableMoment: nowOnServer: ${nowOnServer}, kyivHours: ${kyivHours}  , now: ${now}, tomorrowOnServer: ${tomorrowOnServer}, severalMinutesAgo: ${severalMinutesAgo}, todayDayOfWeek: ${todayDayOfWeekInKyiv}, tomorrowDayOfWeek: ${tomorrowDayOfWeekInKyiv}`
+    );
 
-    if (!nextEnableMoment && tomorrowData.power_on.length) {
-      nextEnableMoment = parse(tomorrowData.power_on[0].time.start, 'HH:mm', now);
-    }
+    const enableMoments = [
+      ...todayData.power_on.time.map(({ start }) =>
+        this.scheduleMomentToDate({ moment: start, baseDate: now })
+      ),
+      ...(tomorrowData.power_on.time.length
+        ? [
+            this.scheduleMomentToDate({
+              moment: tomorrowData.power_on.time[0].start,
+              baseDate: tomorrow,
+            }),
+          ]
+        : []),
+    ];
+    const possibleEnableMoments = [
+      ...todayData.power_on_possible.time.map(({ start }) =>
+        this.scheduleMomentToDate({ moment: start, baseDate: now })
+      ),
+      ...(tomorrowData.power_on_possible.time.length
+        ? [
+            this.scheduleMomentToDate({
+              moment: tomorrowData.power_on_possible.time[0].start,
+              baseDate: tomorrow,
+            }),
+          ]
+        : []),
+    ];
 
-    let nextPossibleEnableMoment: Date | undefined = todayData.power_on_possible
-      .map(({ time: { start } }) => parse(start, 'HH:mm', now))
-      .find(
-        (date) =>
-          differenceInMinutes(date, now) >
-          NEXT_AVAILABILITY_CHANGE_MIN_DIFFERENCE_MINUTES
-      );
+    this.logger.verbose(
+      `enableMoments: ${enableMoments}, possibleEnableMoments: ${possibleEnableMoments}`
+    );
 
-    if (!nextPossibleEnableMoment && tomorrowData.power_on_possible.length) {
-      nextPossibleEnableMoment = parse(
-        tomorrowData.power_on_possible[0].time.start,
-        'HH:mm',
-        now
-      );
-    }
+    const nextEnableMoment = enableMoments.find(
+      (date) => date && date > severalMinutesAgo
+    );
+    const nextPossibleEnableMoment = possibleEnableMoments.find(
+      (date) => date && date > severalMinutesAgo
+    );
 
-    let nextDisableMoment: Date | undefined = todayData.power_off
-      .map(({ time: { start } }) => parse(start, 'HH:mm', now))
-      .find(
-        (date) =>
-          differenceInMinutes(date, now) >
-          NEXT_AVAILABILITY_CHANGE_MIN_DIFFERENCE_MINUTES
-      );
-
-    if (!nextDisableMoment && tomorrowData.power_off.length) {
-      nextDisableMoment = parse(tomorrowData.power_off[0].time.start, 'HH:mm', now);
-    }
-
-    let nextPossibleDisableMoment: Date | undefined =
-      todayData.power_on_possible
-        .map(({ time: { end } }) => parse(end, 'HH:mm', now))
-        .find(
-          (date) =>
-            differenceInMinutes(date, now) >
-            NEXT_AVAILABILITY_CHANGE_MIN_DIFFERENCE_MINUTES
-        );
-
-    if (!nextPossibleDisableMoment && tomorrowData.power_on_possible.length) {
-      nextPossibleDisableMoment = parse(
-        tomorrowData.power_on_possible[0].time.end,
-        'HH:mm',
-        now
-      );
-    }
+    this.logger.verbose(
+      `getNextEnableMoment: nextEnableMoment: ${nextEnableMoment}, nextPossibleEnableMoment: ${nextPossibleEnableMoment}`
+    );
 
     if (
       nextEnableMoment &&
       nextPossibleEnableMoment &&
       nextPossibleEnableMoment > nextEnableMoment
     ) {
-      nextPossibleEnableMoment = undefined;
+      return {
+        enableMoment: nextEnableMoment,
+      };
     }
+
+    return {
+      enableMoment: nextEnableMoment,
+      possibleEnableMoment: nextPossibleEnableMoment,
+    };
+  }
+
+  /**
+   * This assumes power is available now.
+   */
+  public async getNextDisableMoment(params: {
+    readonly scheduleGroupId: number;
+  }): Promise<{
+    readonly disableMoment?: Date;
+    readonly possibleDisableMoment?: Date;
+  }> {
+    const { scheduleGroupId } = params;
+    const data = this.cache[scheduleGroupId]?.response;
+
+    if (!data) {
+      this.logger.warn(
+        `No schedule data found in the cache for group ${scheduleGroupId}`
+      );
+
+      return {};
+    }
+
+    const nowOnServer = new Date();
+    const tomorrowOnServer = addDays(nowOnServer, 1);
+    const kyivHours = nowOnServer.toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false });
+    const now = this.scheduleMomentToDate({ moment: kyivHours, baseDate: nowOnServer });
+    const tomorrow = addDays(now, 1);
+    const severalMinutesAgo = addMinutes(now, -SCHEDULE_INACCURACY_MINUTES);
+    const todayDayOfWeekInKyiv = this.weekDayInKyiv(nowOnServer);
+    const tomorrowDayOfWeekInKyiv = this.weekDayInKyiv(tomorrowOnServer);
+    const todayData = data[todayDayOfWeekInKyiv];
+    const tomorrowData = data[tomorrowDayOfWeekInKyiv];
+
+    this.logger.verbose(
+      `getNextEnableMoment: nowOnServer: ${nowOnServer}, kyivHours: ${kyivHours}  , now: ${now}, tomorrowOnServer: ${tomorrowOnServer}, severalMinutesAgo: ${severalMinutesAgo}, todayDayOfWeek: ${todayDayOfWeekInKyiv}, tomorrowDayOfWeek: ${tomorrowDayOfWeekInKyiv}`
+    );
+
+    const disableMoments = [
+      ...todayData.power_off.time.map(({ start }) =>
+        this.scheduleMomentToDate({ moment: start, baseDate: now })
+      ),
+      ...(tomorrowData.power_off.time.length
+        ? [
+            this.scheduleMomentToDate({
+              moment: tomorrowData.power_off.time[0].start,
+              baseDate: tomorrow,
+            }),
+          ]
+        : []),
+    ];
+    const possibleDisableMoments = [
+      ...todayData.power_on_possible.time.map(({ start }) =>
+        this.scheduleMomentToDate({ moment: start, baseDate: now })
+      ),
+      ...(tomorrowData.power_on_possible.time.length
+        ? [
+            this.scheduleMomentToDate({
+              moment: tomorrowData.power_on_possible.time[0].start,
+              baseDate: tomorrow,
+            }),
+          ]
+        : []),
+    ];
+
+    this.logger.verbose(
+      `disableMoments: ${disableMoments}, possibleDisableMoments: ${possibleDisableMoments}`
+    );
+
+    const nextDisableMoment = disableMoments.find(
+      (date) => date && date > severalMinutesAgo
+    );
+    const nextPossibleDisableMoment = possibleDisableMoments.find(
+      (date) => date && date > severalMinutesAgo
+    );
+
+    this.logger.verbose(
+      `getNextDisableMoment: nextDisableMoment: ${nextDisableMoment}, nextPossibleDisableMoment: ${nextPossibleDisableMoment}`
+    );
 
     if (
       nextDisableMoment &&
       nextPossibleDisableMoment &&
       nextPossibleDisableMoment > nextDisableMoment
     ) {
-      nextPossibleDisableMoment = undefined;
+      return {
+        disableMoment: nextDisableMoment,
+      };
     }
 
     return {
-      enableMoment: nextEnableMoment,
-      possibleEnableMoment: nextPossibleEnableMoment,
       disableMoment: nextDisableMoment,
       possibleDisableMoment: nextPossibleDisableMoment,
     };
@@ -196,23 +265,33 @@ export class KyivElectricstatusScheduleService {
     }
   }
 
+  private weekDayInKyiv(d: Date): keyof ScheduleResponse {
+    return d
+      .toLocaleString('en-US', { weekday: 'long', timeZone: 'Europe/Kiev' })
+      .toLowerCase() as keyof ScheduleResponse;
+  }
+
+  private scheduleMomentToDate(params: {
+    readonly moment: string;
+    readonly baseDate: Date;
+  }): Date {
+    return parse(params.moment, 'HH:mm', params.baseDate);
+  }
+
   private async sleep(params: { readonly ms: number }): Promise<void> {
     return new Promise((r) => setTimeout(r, params.ms));
   }
 }
 
 interface ScheduleMoment {
-  readonly time: {
-    // This is time of the day in 24h format in Kyiv timezone (e.g. "04:00" or "22:00")
-    readonly start: string;
-    readonly end: string;
-  };
+  readonly start: string;
+  readonly end: string;
 }
 
 interface ScheduleDay {
-  readonly power_off: Array<ScheduleMoment>;
-  readonly power_on: Array<ScheduleMoment>;
-  readonly power_on_possible: Array<ScheduleMoment>;
+  readonly power_off: { readonly time: Array<ScheduleMoment> };
+  readonly power_on: { readonly time: Array<ScheduleMoment> };
+  readonly power_on_possible: { readonly time: Array<ScheduleMoment> };
 }
 
 interface ScheduleResponse {
